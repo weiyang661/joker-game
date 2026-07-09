@@ -1123,7 +1123,6 @@ function renderTable() {
     const team = online.connected && online.waitingRoom
       ? (player.human ? (online.readySeats[index] ? "已准备" : "未准备") : "人机候补")
       : player.id === localSeat() ? teamName(player.team) : visibleTeam(player);
-    const cards = player.lastPlay?.cards?.length ? player.lastPlay.cards.map(tinyCard).join("") : `<div class="meta">${player.lastPlay?.name || "等待"}</div>`;
     const revealHands = shouldRevealHands();
     const handPreview = revealHands && player.hand.length
       ? `<div class="miniCards revealedHand">${player.hand.map(tinyCard).join("")}</div>`
@@ -1137,7 +1136,7 @@ function renderTable() {
       <div class="name">${isTurn ? "▶" : ""}${player.name}<span class="badge">${player.hand.length} 张</span></div>
       <div class="meta">${team}${player.finished ? " · 已出完" : ""}</div>
       ${revealMark}
-      <div class="playedCards">${cards}</div>${handPreview}
+      ${handPreview}
     </article>`;
   }).join("");
   renderTableCenter();

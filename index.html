@@ -22,8 +22,14 @@
     </section>
 
     <section class="layout">
-      <aside class="panel scoreboard">
-        <h2>牌局</h2>
+      <aside class="panel scoreboard" id="gameMenu">
+        <div class="menuHeader" id="menuDragHandle">
+          <strong>牌局菜单</strong>
+          <div class="menuTools">
+            <button id="menuShrinkBtn" title="缩小菜单">－</button>
+            <button id="menuGrowBtn" title="放大菜单">＋</button>
+          </div>
+        </div>
         <div class="onlineBox">
           <h2>联机</h2>
           <div class="onlineGrid">
@@ -51,20 +57,20 @@
         </div>
         <div class="statusBox" id="statusBox"></div>
         <div class="revealBox" id="revealBox"></div>
+        <div class="roundLogBox">
+          <h2>当前回合</h2>
+          <div id="currentPlay" class="currentPlay"></div>
+          <h2>记录</h2>
+          <div id="log" class="log"></div>
+        </div>
       </aside>
 
       <section class="tableWrap">
         <div class="table" id="table">
           <div class="tableCenter" id="tableCenter"></div>
         </div>
+        <div class="tablePlayLayer" id="tablePlayLayer"></div>
       </section>
-
-      <aside class="panel">
-        <h2>当前回合</h2>
-        <div id="currentPlay" class="currentPlay"></div>
-        <h2>记录</h2>
-        <div id="log" class="log"></div>
-      </aside>
     </section>
 
     <section class="handPanel">

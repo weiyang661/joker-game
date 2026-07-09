@@ -92,7 +92,7 @@ p { color: var(--muted); font-size: 12px; margin-top: 3px; }
   top: 14px;
   z-index: 30;
   display: block;
-  width: 390px;
+  width: min(560px, calc(100vw - 36px));
   max-width: calc(100vw - 36px);
   pointer-events: none;
 }
@@ -127,28 +127,62 @@ p { color: var(--muted); font-size: 12px; margin-top: 3px; }
 
 .scoreboard {
   position: fixed;
-  left: 18px;
-  top: 62px;
+  left: var(--menu-left, 18px);
+  top: var(--menu-top, 62px);
   z-index: 25;
-  width: 390px;
+  width: min(560px, calc(100vw - 36px));
   max-width: calc(100vw - 36px);
-  padding: 10px;
+  max-height: calc(100vh - 86px);
+  padding: 12px;
   display: grid;
   grid-template-columns: 1.15fr .85fr;
   gap: 8px;
   align-items: start;
+  overflow: auto;
+  transform: scale(var(--menu-scale, 1));
+  transform-origin: top left;
 }
 
-.scoreboard > h2 { display: none; }
+.menuHeader {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 38px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: rgba(0,0,0,.30);
+  border: 1px solid rgba(255,255,255,.12);
+  color: #fff7d4;
+  font-size: 16px;
+  font-weight: 900;
+  cursor: move;
+  user-select: none;
+}
+
+.menuTools {
+  display: flex;
+  gap: 6px;
+}
+
+.menuTools button {
+  width: 32px;
+  height: 28px;
+  padding: 0;
+  border-radius: 7px;
+  line-height: 1;
+}
 
 body[data-menu="mini"] .scoreboard {
-  width: 230px;
+  width: 300px;
   grid-template-columns: 1fr;
 }
 
 body[data-menu="mini"] .onlineBox,
 body[data-menu="mini"] .matchList,
-body[data-menu="mini"] .statusBox {
+body[data-menu="mini"] .statusBox,
+body[data-menu="mini"] .roundLogBox {
   display: none;
 }
 
@@ -272,24 +306,20 @@ body[data-menu="hidden"] .topActions button:not(#menuToggleBtn) {
 
 .revealBox { margin-top: 0; }
 
-.layout > .panel:not(.scoreboard) {
-  position: fixed;
-  right: 18px;
-  top: 14px;
-  z-index: 24;
-  width: 260px;
-  max-height: 45vh;
-  padding: 10px;
-  overflow: hidden;
+.roundLogBox {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 8px;
+  padding-top: 2px;
 }
 
 .currentPlay {
-  max-height: 118px;
+  max-height: 120px;
   overflow: auto;
 }
 
 .log {
-  max-height: 245px;
+  max-height: min(34vh, 280px);
   overflow: auto;
   display: flex;
   flex-direction: column;
@@ -819,30 +849,29 @@ body[data-menu="hidden"] .topActions button:not(#menuToggleBtn) {
     grid-template-rows: auto minmax(500px, 1fr) auto;
   }
   .topbar {
-    position: static;
-    width: auto;
-    max-width: none;
-    margin-bottom: 6px;
+    position: fixed;
+    width: min(560px, calc(100vw - 16px));
+    max-width: calc(100vw - 16px);
+    left: 8px;
+    top: 8px;
   }
   body[data-menu="hidden"] .topbar,
   body[data-menu="mini"] .topbar {
-    width: auto;
+    width: 124px;
   }
   .scoreboard {
-    position: static;
-    width: auto;
-    max-width: none;
-    grid-template-columns: 1fr;
-    margin-bottom: 8px;
+    position: fixed;
+    width: min(560px, calc(100vw - 16px));
+    max-width: calc(100vw - 16px);
+    grid-template-columns: 1.15fr .85fr;
+    margin-bottom: 0;
+    max-height: calc(100vh - 74px);
   }
   body[data-menu="mini"] .scoreboard {
-    width: auto;
-  }
-  .layout > .panel:not(.scoreboard) {
-    display: none;
+    width: 300px;
   }
   .tableWrap {
-    margin-top: 0;
+    margin-top: 48px;
     min-height: 500px;
     height: 58vh;
   }

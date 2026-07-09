@@ -50,6 +50,10 @@ const el = {
   playBtn: document.querySelector("#playBtn"),
   passBtn: document.querySelector("#passBtn"),
   clearBtn: document.querySelector("#clearBtn"),
+  gameMenu: document.querySelector("#gameMenu"),
+  menuDragHandle: document.querySelector("#menuDragHandle"),
+  menuShrinkBtn: document.querySelector("#menuShrinkBtn"),
+  menuGrowBtn: document.querySelector("#menuGrowBtn"),
   menuToggleBtn: document.querySelector("#menuToggleBtn"),
   newGameBtn: document.querySelector("#newGameBtn"),
   nextRoundBtn: document.querySelector("#nextRoundBtn"),
@@ -79,6 +83,9 @@ const online = {
 };
 
 let menuMode = "full";
+let menuScale = 1;
+let menuPosition = { left: 18, top: 62 };
+let menuDragging = null;
 
 function shuffle(list) {
   const copy = [...list];
@@ -1020,6 +1027,17 @@ function render() {
   broadcastSnapshot();
 }
 
+function applyMenuLayout() {
+  if (!el.gameMenu) return;
+  const maxLeft = Math.max(8, window.innerWidth - 90);
+  const maxTop = Math.max(8, window.innerHeight - 80);
+  menuPosition.left = Math.min(Math.max(8, menuPosition.left), maxLeft);
+  menuPosition.top = Math.min(Math.max(8, menuPosition.top), maxTop);
+  el.gameMenu.style.setProperty("--menu-left", `${menuPosition.left}px`);
+  el.gameMenu.style.setProperty("--menu-top", `${menuPosition.top}px`);
+  el.gameMenu.style.setProperty("--menu-scale", menuScale.toFixed(2));
+}
+
 function serializeState() {
   return JSON.stringify(state, (key, value) => value instanceof Set ? { __set: [...value] } : value);
 }
@@ -1259,6 +1277,7 @@ function laneName(lane) {
 function renderPanels() {
   normalizeScores();
   document.body.dataset.menu = menuMode;
+  applyMenuLayout();
   el.menuToggleBtn.textContent = menuMode === "full" ? "缩小菜单" : menuMode === "mini" ? "收起菜单" : "展开菜单";
   el.newGameBtn.disabled = online.connected && !online.isHost;
   el.nextRoundBtn.disabled = online.waitingRoom || !state.gameOver || state.continuingForNextLead || state.revealPhase;
@@ -1445,6 +1464,44 @@ el.menuToggleBtn.addEventListener("click", () => {
   menuMode = menuMode === "full" ? "mini" : menuMode === "mini" ? "hidden" : "full";
   renderPanels();
 });
+
+el.menuShrinkBtn.addEventListener("click", () => {
+  menuScale = Math.max(0.78, Number((menuScale - 0.08).toFixed(2)));
+  applyMenuLayout();
+});
+
+el.menuGrowBtn.addEventListener("click", () => {
+  menuScale = Math.min(1.28, Number((menuScale + 0.08).toFixed(2)));
+  applyMenuLayout();
+});
+
+el.menuDragHandle.addEventListener("pointerdown", event => {
+  if (event.target.closest("button")) return;
+  menuDragging = {
+    pointerId: event.pointerId,
+    startX: event.clientX,
+    startY: event.clientY,
+    left: menuPosition.left,
+    top: menuPosition.top
+  };
+  el.menuDragHandle.setPointerCapture(event.pointerId);
+});
+
+el.menuDragHandle.addEventListener("pointermove", event => {
+  if (!menuDragging || menuDragging.pointerId !== event.pointerId) return;
+  menuPosition.left = menuDragging.left + event.clientX - menuDragging.startX;
+  menuPosition.top = menuDragging.top + event.clientY - menuDragging.startY;
+  applyMenuLayout();
+});
+
+function stopMenuDrag(event) {
+  if (!menuDragging || menuDragging.pointerId !== event.pointerId) return;
+  menuDragging = null;
+}
+
+el.menuDragHandle.addEventListener("pointerup", stopMenuDrag);
+el.menuDragHandle.addEventListener("pointercancel", stopMenuDrag);
+window.addEventListener("resize", applyMenuLayout);
 
 el.newGameBtn.addEventListener("click", () => {
   if (online.connected && !online.isHost) return;

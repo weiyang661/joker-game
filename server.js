@@ -47,7 +47,7 @@ server.on("upgrade", (req, socket) => {
     "",
     ""
   ].join("\r\n"));
-  const client = { id: crypto.randomBytes(4).toString("hex"), socket, roomId: null, host: false };
+  const client = { id: crypto.randomBytes(4).toString("hex"), socket, roomId: null, host: false, buffer: Buffer.alloc(0) };
   socket.setTimeout(1000 * 60 * 60);
   socket.on("data", data => handleFrames(client, data));
   socket.on("close", () => leave(client));
@@ -55,22 +55,40 @@ server.on("upgrade", (req, socket) => {
 });
 
 function handleFrames(client, data) {
+  client.buffer = Buffer.concat([client.buffer, data]);
   let offset = 0;
-  while (offset + 2 <= data.length) {
-    const byte1 = data[offset++];
-    const byte2 = data[offset++];
+  while (offset + 2 <= client.buffer.length) {
+    const frameStart = offset;
+    const byte1 = client.buffer[offset++];
+    const byte2 = client.buffer[offset++];
     let length = byte2 & 127;
     if (length === 126) {
-      length = data.readUInt16BE(offset);
+      if (offset + 2 > client.buffer.length) {
+        offset = frameStart;
+        break;
+      }
+      length = client.buffer.readUInt16BE(offset);
       offset += 2;
     } else if (length === 127) {
-      length = Number(data.readBigUInt64BE(offset));
+      if (offset + 8 > client.buffer.length) {
+        offset = frameStart;
+        break;
+      }
+      length = Number(client.buffer.readBigUInt64BE(offset));
       offset += 8;
     }
     const masked = (byte2 & 128) !== 0;
-    const mask = masked ? data.slice(offset, offset + 4) : null;
+    if (masked && offset + 4 > client.buffer.length) {
+      offset = frameStart;
+      break;
+    }
+    const mask = masked ? client.buffer.slice(offset, offset + 4) : null;
     if (masked) offset += 4;
-    const payload = data.slice(offset, offset + length);
+    if (offset + length > client.buffer.length) {
+      offset = frameStart;
+      break;
+    }
+    const payload = client.buffer.slice(offset, offset + length);
     offset += length;
     if ((byte1 & 15) === 8) return client.socket.end();
     if (mask) {
@@ -82,6 +100,7 @@ function handleFrames(client, data) {
       send(client, { type: "error", message: "消息格式错误" });
     }
   }
+  client.buffer = client.buffer.slice(offset);
 }
 
 function handleMessage(client, message) {

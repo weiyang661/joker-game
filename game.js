@@ -245,6 +245,15 @@ function setSeatReady(seat, ready) {
   render();
 }
 
+function firstOpenSeat(preferredSeat = null) {
+  const preferred = Number(preferredSeat);
+  if (preferred >= 1 && preferred <= 4 && !online.seatClients[preferred]) return preferred;
+  for (let seat = 1; seat <= 4; seat += 1) {
+    if (!online.seatClients[seat]) return seat;
+  }
+  return null;
+}
+
 function startGame(options = {}) {
   if (options.resetMatch) {
     state.playerMatch = [0, 0, 0, 0, 0];
@@ -1465,15 +1474,16 @@ el.joinBtn.addEventListener("click", async () => {
   }
   await openSocket();
   online.isHost = false;
-  online.seat = Number(el.seatSelect.value);
-  const name = cleanPlayerName(el.nameInput.value, `玩家 ${online.seat}`);
+  const requestedSeat = Number(el.seatSelect.value);
+  online.seat = requestedSeat;
+  const name = cleanPlayerName(el.nameInput.value, `玩家 ${requestedSeat}`);
   online.waitingRoom = true;
   online.readySeats = {};
-  setupWaitingRoom({ preserveNames: { [online.seat]: name } });
-  state.players[online.seat].human = true;
-  state.players[online.seat].name = name;
+  setupWaitingRoom({ preserveNames: { [requestedSeat]: name } });
+  state.players[requestedSeat].human = true;
+  state.players[requestedSeat].name = name;
   state.tableNotice = "正在加入房间...";
-  sendSocket({ type: "join", roomId, seat: online.seat, name });
+  sendSocket({ type: "join", roomId, seat: requestedSeat, name });
   el.onlineStatus.textContent = "正在加入房间...";
   render();
 });
@@ -1545,9 +1555,10 @@ function handleSocketMessage(message) {
     return;
   }
   if (message.type === "joinRequest" && online.isHost) {
-    const seat = Number(message.seat);
-    if (!seat || seat < 1 || seat > 4 || online.seatClients[seat]) {
-      sendSocket({ type: "relay", to: message.clientId, payload: { type: "error", message: "座位不可用" } });
+    const requestedSeat = Number(message.seat);
+    const seat = firstOpenSeat(requestedSeat);
+    if (!seat) {
+      sendSocket({ type: "relay", to: message.clientId, payload: { type: "error", message: "房间已满" } });
       return;
     }
     online.seatClients[seat] = message.clientId;
@@ -1555,10 +1566,11 @@ function handleSocketMessage(message) {
     delete online.readySeats[seat];
     state.players[seat].name = message.name || `玩家 ${seat}`;
     state.players[seat].human = true;
+    const moved = requestedSeat !== seat;
     state.tableNotice = online.waitingRoom
-      ? `${state.players[seat].name} 已加入，等待房主开始本局`
+      ? `${state.players[seat].name} 已加入座位 ${seat}，等待房主开始本局`
       : `${state.players[seat].name} 加入座位 ${seat}`;
-    addLog(`${state.players[seat].name} 加入座位 ${seat}。`);
+    addLog(`${state.players[seat].name} 加入座位 ${seat}${moved ? `（原座位 ${requestedSeat} 已占用，自动分配）` : ""}。`);
     render();
     return;
   }
@@ -1582,12 +1594,16 @@ function handleSocketMessage(message) {
     return;
   }
   if (message.type === "snapshot") {
+    const previousSeat = online.seat;
     loadState(message.state);
     online.seat = message.seat;
     online.roomId = message.roomId || online.roomId;
     online.waitingRoom = !!message.waitingRoom;
     online.readySeats = message.readySeats || {};
     if (state.players[online.seat] && !el.nameInput.value.trim()) el.nameInput.value = state.players[online.seat].name;
+    if (previousSeat && previousSeat !== online.seat) {
+      state.tableNotice = `你选择的座位已占用，已自动进入座位 ${online.seat}`;
+    }
     render();
     updateOnlineStatus();
     return;

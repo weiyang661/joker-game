@@ -100,7 +100,7 @@ p { color: var(--muted); font-size: 12px; margin-top: 3px; }
 .topActions {
   pointer-events: auto;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 7px;
 }
 
@@ -140,6 +140,42 @@ p { color: var(--muted); font-size: 12px; margin-top: 3px; }
 }
 
 .scoreboard > h2 { display: none; }
+
+body[data-menu="mini"] .scoreboard {
+  width: 230px;
+  grid-template-columns: 1fr;
+}
+
+body[data-menu="mini"] .onlineBox,
+body[data-menu="mini"] .matchList,
+body[data-menu="mini"] .statusBox {
+  display: none;
+}
+
+body[data-menu="mini"] .scoreRows {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+body[data-menu="mini"] .scoreRows .scoreListRow,
+body[data-menu="mini"] .revealBox {
+  grid-column: 1 / -1;
+}
+
+body[data-menu="hidden"] .scoreboard {
+  display: none;
+}
+
+body[data-menu="hidden"] .topbar {
+  width: 124px;
+}
+
+body[data-menu="hidden"] .topActions {
+  grid-template-columns: 1fr;
+}
+
+body[data-menu="hidden"] .topActions button:not(#menuToggleBtn) {
+  display: none;
+}
 
 .onlineBox {
   grid-row: span 3;
@@ -317,13 +353,13 @@ p { color: var(--muted); font-size: 12px; margin-top: 3px; }
   position: absolute;
   left: 50%;
   top: 52%;
-  width: min(430px, 58%);
-  min-height: 124px;
+  width: min(780px, 68%);
+  min-height: 156px;
   transform: translate(-50%, -50%);
   z-index: 4;
   padding: 12px 16px;
   border-radius: 12px;
-  background: rgba(0, 0, 0, .13);
+  background: rgba(0, 0, 0, .08);
   color: #fff;
   text-align: center;
   box-shadow: none;
@@ -359,6 +395,68 @@ p { color: var(--muted); font-size: 12px; margin-top: 3px; }
   justify-content: center;
   gap: 0;
   margin-top: 9px;
+}
+
+.tablePlayedName {
+  margin-top: 12px;
+  color: #ffe793;
+  font-size: 16px;
+  font-weight: 900;
+  text-shadow: 0 2px 4px rgba(0,0,0,.35);
+}
+
+.tablePlayedCards {
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 0;
+  margin: 10px auto 0;
+  max-width: min(720px, 76vw);
+  min-height: 84px;
+}
+
+.tableCard {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  width: clamp(46px, 4.3vw, 66px);
+  height: clamp(68px, 6.2vw, 94px);
+  margin-left: clamp(-12px, -1vw, -7px);
+  padding: 6px 5px;
+  border-radius: 7px;
+  border: 1px solid #bbb;
+  background: linear-gradient(#fff, #e7e7e4);
+  color: #111;
+  box-shadow: 0 8px 14px rgba(0,0,0,.28);
+  font-family: Georgia, "Times New Roman", serif;
+  font-weight: 900;
+}
+
+.tableCard:first-child { margin-left: 0; }
+.tableCard.red { color: var(--red); }
+.tableCard.joker { color: var(--blue); }
+.tableCard b {
+  font-size: clamp(20px, 2.1vw, 34px);
+  line-height: .95;
+}
+.tableCard i {
+  align-self: end;
+  justify-self: center;
+  font-style: normal;
+  font-size: clamp(18px, 1.8vw, 28px);
+}
+.tableCard em {
+  position: absolute;
+  right: 5px;
+  bottom: 24px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #e09a2d;
+  color: white;
+  font: 900 12px/18px "Microsoft YaHei", sans-serif;
+  text-align: center;
 }
 
 .settlementStrip {
@@ -681,12 +779,19 @@ p { color: var(--muted); font-size: 12px; margin-top: 3px; }
     max-width: none;
     margin-bottom: 6px;
   }
+  body[data-menu="hidden"] .topbar,
+  body[data-menu="mini"] .topbar {
+    width: auto;
+  }
   .scoreboard {
     position: static;
     width: auto;
     max-width: none;
     grid-template-columns: 1fr;
     margin-bottom: 8px;
+  }
+  body[data-menu="mini"] .scoreboard {
+    width: auto;
   }
   .layout > .panel:not(.scoreboard) {
     display: none;
@@ -699,10 +804,18 @@ p { color: var(--muted); font-size: 12px; margin-top: 3px; }
   .table { min-height: 500px; }
   .seat {
     width: 130px;
-    transform: translate(-50%, -50%) scale(.84);
+    transform: translate(-50%, -50%) scale(.78);
   }
   .tableCenter {
-    width: 76%;
+    width: 82%;
+    min-height: 140px;
+  }
+  .tablePlayedCards {
+    max-width: 86vw;
+  }
+  .tableCard {
+    width: 42px;
+    height: 62px;
   }
   .handPanel {
     position: relative;

@@ -49,6 +49,7 @@ const el = {
   playBtn: document.querySelector("#playBtn"),
   passBtn: document.querySelector("#passBtn"),
   clearBtn: document.querySelector("#clearBtn"),
+  menuToggleBtn: document.querySelector("#menuToggleBtn"),
   newGameBtn: document.querySelector("#newGameBtn"),
   nextRoundBtn: document.querySelector("#nextRoundBtn"),
   autoBtn: document.querySelector("#autoBtn"),
@@ -75,6 +76,8 @@ const online = {
   readySeats: {},
   waitingRoom: false
 };
+
+let menuMode = "full";
 
 function shuffle(list) {
   const copy = [...list];
@@ -1074,8 +1077,8 @@ function renderTableCenter() {
     ? ""
     : `<div class="centerLine">轮到：<strong>${player?.name || "无"}</strong></div>`;
   const last = state.currentPlay
-    ? `<div class="centerPlay">${state.currentPlay.cards.map(tinyCard).join("")}</div><div class="centerLine">${state.currentPlay.name}</div>`
-    : `<div class="centerLine">新回合</div>`;
+    ? `<div class="tablePlayedName">${state.currentPlay.name}</div><div class="tablePlayedCards">${state.currentPlay.cards.map(tableCard).join("")}</div>`
+    : `<div class="tablePlayedName">新回合</div>`;
   const settlement = state.roundSettled
     ? `<div class="settlementStrip">${state.lastSettlement.map(item => `<span>${item.name} 总分 ${item.total} 本局 ${formatSigned(item.delta)}</span>`).join("")}</div>`
     : "";
@@ -1109,11 +1112,11 @@ function revealedBigStatus(player) {
 
 function renderTable() {
   const positions = [
-    ["15%", "88%"],
+    ["18%", "78%"],
     ["8%", "50%"],
     ["50%", "13%"],
     ["92%", "50%"],
-    ["85%", "88%"]
+    ["82%", "78%"]
   ];
   el.table.innerHTML = state.players.map((player, index) => {
     const isTurn = index === state.current && (!state.gameOver || state.continuingForNextLead);
@@ -1235,6 +1238,8 @@ function laneName(lane) {
 
 function renderPanels() {
   normalizeScores();
+  document.body.dataset.menu = menuMode;
+  el.menuToggleBtn.textContent = menuMode === "full" ? "缩小菜单" : menuMode === "mini" ? "收起菜单" : "展开菜单";
   el.newGameBtn.disabled = online.connected && !online.isHost;
   el.nextRoundBtn.disabled = online.waitingRoom || !state.gameOver || state.continuingForNextLead || state.revealPhase;
   if (online.connected && !online.isHost) el.nextRoundBtn.disabled = true;
@@ -1365,6 +1370,12 @@ function tinyCard(card) {
   return `<span class="tinyCard${color}${cardStateClass(card)}">${cardLabel(card)}${pointBadge}</span>`;
 }
 
+function tableCard(card) {
+  const color = card.color === "red" ? " red" : card.color === "joker" ? " joker" : "";
+  const pointBadge = card.points ? `<em>分</em>` : "";
+  return `<span class="tableCard${color}${cardStateClass(card)}"><b>${cardLabel(card)}</b><i>${card.suit}</i>${pointBadge}</span>`;
+}
+
 function selectedCards() {
   const ids = state.selected;
   return localPlayer().hand.filter(card => ids.has(card.id));
@@ -1408,6 +1419,11 @@ el.autoBtn.addEventListener("click", () => {
   else pass(localPlayer());
   state.selected.clear();
   render();
+});
+
+el.menuToggleBtn.addEventListener("click", () => {
+  menuMode = menuMode === "full" ? "mini" : menuMode === "mini" ? "hidden" : "full";
+  renderPanels();
 });
 
 el.newGameBtn.addEventListener("click", () => {

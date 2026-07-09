@@ -1118,7 +1118,7 @@ function renderTable() {
     ["92%", "50%"],
     ["82%", "78%"]
   ];
-  el.table.innerHTML = state.players.map((player, index) => {
+  const seats = state.players.map((player, index) => {
     const isTurn = index === state.current && (!state.gameOver || state.continuingForNextLead);
     const team = online.connected && online.waitingRoom
       ? (player.human ? (online.readySeats[index] ? "已准备" : "未准备") : "人机候补")
@@ -1139,6 +1139,8 @@ function renderTable() {
       ${handPreview}
     </article>`;
   }).join("");
+  el.table.innerHTML = `${seats}<div class="tableCenter" id="tableCenter"></div>`;
+  el.tableCenter = document.querySelector("#tableCenter");
   renderTableCenter();
 }
 

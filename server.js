@@ -6,11 +6,12 @@ const path = require("path");
 const root = __dirname;
 const rooms = new Map();
 const startedAt = Date.now();
+const version = "2026-07-09-ws-fragment-fix";
 
 const server = http.createServer((req, res) => {
   const urlPath = decodeURIComponent(req.url.split("?")[0]);
   if (urlPath === "/healthz") {
-    const body = JSON.stringify({ ok: true, rooms: rooms.size, uptimeMs: Date.now() - startedAt });
+    const body = JSON.stringify({ ok: true, version, rooms: rooms.size, uptimeMs: Date.now() - startedAt });
     res.writeHead(200, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" });
     res.end(body);
     return;
@@ -47,7 +48,14 @@ server.on("upgrade", (req, socket) => {
     "",
     ""
   ].join("\r\n"));
-  const client = { id: crypto.randomBytes(4).toString("hex"), socket, roomId: null, host: false, buffer: Buffer.alloc(0) };
+  const client = {
+    id: crypto.randomBytes(4).toString("hex"),
+    socket,
+    roomId: null,
+    host: false,
+    buffer: Buffer.alloc(0),
+    messageParts: []
+  };
   socket.setTimeout(1000 * 60 * 60);
   socket.on("data", data => handleFrames(client, data));
   socket.on("close", () => leave(client));
@@ -60,6 +68,8 @@ function handleFrames(client, data) {
   while (offset + 2 <= client.buffer.length) {
     const frameStart = offset;
     const byte1 = client.buffer[offset++];
+    const fin = (byte1 & 128) !== 0;
+    const opcode = byte1 & 15;
     const byte2 = client.buffer[offset++];
     let length = byte2 & 127;
     if (length === 126) {
@@ -90,17 +100,42 @@ function handleFrames(client, data) {
     }
     const payload = client.buffer.slice(offset, offset + length);
     offset += length;
-    if ((byte1 & 15) === 8) return client.socket.end();
+    if (opcode === 8) return client.socket.end();
     if (mask) {
       for (let i = 0; i < payload.length; i += 1) payload[i] ^= mask[i % 4];
     }
-    try {
-      handleMessage(client, JSON.parse(payload.toString("utf8")));
-    } catch {
-      send(client, { type: "error", message: "消息格式错误" });
+    if (opcode === 9) {
+      sendFrame(client, payload, 10);
+      continue;
     }
+    if (opcode === 0) {
+      client.messageParts.push(Buffer.from(payload));
+      if (fin) {
+        handleTextPayload(client, Buffer.concat(client.messageParts));
+        client.messageParts = [];
+      }
+      continue;
+    }
+    if (opcode !== 1) continue;
+    if (!fin) {
+      client.messageParts = [Buffer.from(payload)];
+      continue;
+    }
+    handleTextPayload(client, payload);
   }
   client.buffer = client.buffer.slice(offset);
+}
+
+function handleTextPayload(client, payload) {
+  if (payload.length > 2 * 1024 * 1024) {
+    send(client, { type: "error", message: "消息过大" });
+    return;
+  }
+  try {
+    handleMessage(client, JSON.parse(payload.toString("utf8")));
+  } catch {
+    send(client, { type: "error", message: "消息格式错误" });
+  }
 }
 
 function handleMessage(client, message) {
@@ -142,14 +177,18 @@ function handleMessage(client, message) {
 
 function send(client, message) {
   const payload = Buffer.from(JSON.stringify(message), "utf8");
+  sendFrame(client, payload, 1);
+}
+
+function sendFrame(client, payload, opcode = 1) {
   let header;
   if (payload.length < 126) {
-    header = Buffer.from([129, payload.length]);
+    header = Buffer.from([128 | opcode, payload.length]);
   } else if (payload.length <= 65535) {
-    header = Buffer.from([129, 126, payload.length >> 8, payload.length & 255]);
+    header = Buffer.from([128 | opcode, 126, payload.length >> 8, payload.length & 255]);
   } else {
     header = Buffer.alloc(10);
-    header[0] = 129;
+    header[0] = 128 | opcode;
     header[1] = 127;
     header.writeBigUInt64BE(BigInt(payload.length), 2);
   }
@@ -176,7 +215,7 @@ function newRoomId() {
 
 const port = Number(process.env.PORT || 8787);
 server.listen(port, "0.0.0.0", () => {
-  console.log(`五人牌局联机服务已启动: http://localhost:${port}`);
+  console.log(`五人牌局联机服务已启动: http://localhost:${port} (${version})`);
 });
 
 process.on("SIGTERM", () => server.close(() => process.exit(0)));

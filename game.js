@@ -26,6 +26,7 @@ const state = {
   hasPlayed: false,
   revealPhase: true,
   bigRevealDecisions: new Set(),
+  publicBigIds: new Set(),
   pendingSnowChoice: null,
   snowChasingTeam: null,
   tableNotice: "",
@@ -207,6 +208,7 @@ function setupWaitingRoom(options = {}) {
   state.hasPlayed = false;
   state.revealPhase = false;
   state.bigRevealDecisions = new Set();
+  state.publicBigIds = new Set();
   state.pendingSnowChoice = null;
   state.snowChasingTeam = null;
   state.tableNotice = "等待玩家加入并准备";
@@ -285,6 +287,7 @@ function startGame(options = {}) {
   state.hasPlayed = false;
   state.revealPhase = true;
   state.bigRevealDecisions = new Set();
+  state.publicBigIds = new Set();
   state.pendingSnowChoice = null;
   state.snowChasingTeam = null;
   state.tableNotice = "等待持有大王的玩家选择亮王";
@@ -292,7 +295,7 @@ function startGame(options = {}) {
   state.roundSettled = false;
   state.log = [];
   state.players.forEach(player => {
-    if (player.id === 0 || player.revealedBigs.size) player.knownTeam = true;
+    if (player.revealedBigs.size) player.knownTeam = true;
   });
   state.openingBigRevealCount = 0;
   state.revealToken = Symbol("reveal");
@@ -342,6 +345,7 @@ function decideBigReveal(player, card, reveal) {
   state.bigRevealDecisions.add(card.id);
   if (reveal) {
     player.revealedBigs.add(card.id);
+    state.publicBigIds.add(card.id);
     player.knownTeam = true;
     player.revealAnnouncement = "亮出一张大王";
     state.tableNotice = `${player.name} 亮出一张大王`;
@@ -360,7 +364,10 @@ function decidePlayerBigReveal(player, revealCount) {
   const showCount = Math.max(0, Math.min(revealCount, bigs.length));
   bigs.forEach((card, index) => {
     state.bigRevealDecisions.add(card.id);
-    if (index < showCount) player.revealedBigs.add(card.id);
+    if (index < showCount) {
+      player.revealedBigs.add(card.id);
+      state.publicBigIds.add(card.id);
+    }
   });
   if (showCount > 0) player.knownTeam = true;
   const message = bigs.length === 2
@@ -592,7 +599,11 @@ function playCards(player, cards) {
   const play = classify(cards);
   const beat = canBeat(play, state.currentPlay);
   if (!beat.ok) return beat;
-  if (cards.some(card => card.joker === "big")) player.knownTeam = true;
+  const playedBigs = cards.filter(card => card.joker === "big");
+  if (playedBigs.length) {
+    playedBigs.forEach(card => state.publicBigIds.add(card.id));
+    player.knownTeam = true;
+  }
   state.hasPlayed = true;
   removeCards(player.hand, cards);
   player.lastPlay = play;
@@ -1116,17 +1127,20 @@ function shouldRevealHands() {
 
 function visibleTeam(player) {
   if (player.knownTeam) return teamName(player.team);
-  if (allKingPlayersKnown()) return teamName("plain");
+  if (allPublicBigCardsKnown()) return teamName("plain");
   return "阵营未知";
 }
 
 function allKingPlayersKnown() {
-  const kingPlayers = state.players.filter(player => player.bigCardIds?.size);
-  return kingPlayers.length > 0 && kingPlayers.every(player => player.knownTeam);
+  return allPublicBigCardsKnown();
 }
 
 function allTeamsDetermined() {
-  return allKingPlayersKnown();
+  return allPublicBigCardsKnown();
+}
+
+function allPublicBigCardsKnown() {
+  return (state.publicBigIds?.size || 0) >= 2;
 }
 
 function renderHand() {

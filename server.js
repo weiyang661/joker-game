@@ -1,0 +1,164 @@
+const http = require("http");
+const crypto = require("crypto");
+const fs = require("fs");
+const path = require("path");
+
+const root = __dirname;
+const rooms = new Map();
+const startedAt = Date.now();
+
+const server = http.createServer((req, res) => {
+  const urlPath = decodeURIComponent(req.url.split("?")[0]);
+  if (urlPath === "/healthz") {
+    const body = JSON.stringify({ ok: true, rooms: rooms.size, uptimeMs: Date.now() - startedAt });
+    res.writeHead(200, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" });
+    res.end(body);
+    return;
+  }
+  const filePath = path.join(root, urlPath === "/" ? "index.html" : urlPath);
+  if (!filePath.startsWith(root)) {
+    res.writeHead(403).end();
+    return;
+  }
+  fs.readFile(filePath, (err, data) => {
+    if (err) {
+      res.writeHead(404).end("Not found");
+      return;
+    }
+    const ext = path.extname(filePath);
+    const types = { ".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8", ".js": "application/javascript; charset=utf-8" };
+    res.writeHead(200, { "Content-Type": types[ext] || "application/octet-stream", "Cache-Control": "no-store" });
+    res.end(data);
+  });
+});
+
+server.on("upgrade", (req, socket) => {
+  const key = req.headers["sec-websocket-key"];
+  if (!key) return socket.destroy();
+  const accept = crypto
+    .createHash("sha1")
+    .update(`${key}258EAFA5-E914-47DA-95CA-C5AB0DC85B11`)
+    .digest("base64");
+  socket.write([
+    "HTTP/1.1 101 Switching Protocols",
+    "Upgrade: websocket",
+    "Connection: Upgrade",
+    `Sec-WebSocket-Accept: ${accept}`,
+    "",
+    ""
+  ].join("\r\n"));
+  const client = { id: crypto.randomBytes(4).toString("hex"), socket, roomId: null, host: false };
+  socket.setTimeout(1000 * 60 * 60);
+  socket.on("data", data => handleFrames(client, data));
+  socket.on("close", () => leave(client));
+  socket.on("error", () => leave(client));
+});
+
+function handleFrames(client, data) {
+  let offset = 0;
+  while (offset + 2 <= data.length) {
+    const byte1 = data[offset++];
+    const byte2 = data[offset++];
+    let length = byte2 & 127;
+    if (length === 126) {
+      length = data.readUInt16BE(offset);
+      offset += 2;
+    } else if (length === 127) {
+      length = Number(data.readBigUInt64BE(offset));
+      offset += 8;
+    }
+    const masked = (byte2 & 128) !== 0;
+    const mask = masked ? data.slice(offset, offset + 4) : null;
+    if (masked) offset += 4;
+    const payload = data.slice(offset, offset + length);
+    offset += length;
+    if ((byte1 & 15) === 8) return client.socket.end();
+    if (mask) {
+      for (let i = 0; i < payload.length; i += 1) payload[i] ^= mask[i % 4];
+    }
+    try {
+      handleMessage(client, JSON.parse(payload.toString("utf8")));
+    } catch {
+      send(client, { type: "error", message: "消息格式错误" });
+    }
+  }
+}
+
+function handleMessage(client, message) {
+  if (message.type === "create") {
+    leave(client);
+    const roomId = newRoomId();
+    rooms.set(roomId, { host: client, clients: new Map([[client.id, client]]) });
+    client.roomId = roomId;
+    client.host = true;
+    send(client, { type: "created", roomId, clientId: client.id });
+    return;
+  }
+  if (message.type === "join") {
+    leave(client);
+    const room = rooms.get(String(message.roomId || "").toUpperCase());
+    if (!room) return send(client, { type: "error", message: "房间不存在" });
+    room.clients.set(client.id, client);
+    client.roomId = String(message.roomId).toUpperCase();
+    client.host = false;
+    send(client, { type: "joined", roomId: client.roomId, clientId: client.id });
+    send(room.host, { type: "joinRequest", clientId: client.id, seat: message.seat, name: message.name || "玩家" });
+    return;
+  }
+  const room = rooms.get(client.roomId);
+  if (!room) return;
+  if (client.host) {
+    if (message.to) {
+      const target = room.clients.get(message.to);
+      if (target) send(target, message.payload);
+    } else {
+      for (const peer of room.clients.values()) {
+        if (peer !== client) send(peer, message.payload);
+      }
+    }
+  } else {
+    send(room.host, { type: "clientMessage", clientId: client.id, payload: message });
+  }
+}
+
+function send(client, message) {
+  const payload = Buffer.from(JSON.stringify(message), "utf8");
+  let header;
+  if (payload.length < 126) {
+    header = Buffer.from([129, payload.length]);
+  } else if (payload.length <= 65535) {
+    header = Buffer.from([129, 126, payload.length >> 8, payload.length & 255]);
+  } else {
+    header = Buffer.alloc(10);
+    header[0] = 129;
+    header[1] = 127;
+    header.writeBigUInt64BE(BigInt(payload.length), 2);
+  }
+  client.socket.write(Buffer.concat([header, payload]));
+}
+
+function leave(client) {
+  const room = rooms.get(client.roomId);
+  if (!room) return;
+  room.clients.delete(client.id);
+  if (room.host === client || room.clients.size === 0) rooms.delete(client.roomId);
+  else send(room.host, { type: "peerLeft", clientId: client.id });
+  client.roomId = null;
+  client.host = false;
+}
+
+function newRoomId() {
+  let id;
+  do {
+    id = crypto.randomBytes(3).toString("hex").toUpperCase();
+  } while (rooms.has(id));
+  return id;
+}
+
+const port = Number(process.env.PORT || 8787);
+server.listen(port, "0.0.0.0", () => {
+  console.log(`五人牌局联机服务已启动: http://localhost:${port}`);
+});
+
+process.on("SIGTERM", () => server.close(() => process.exit(0)));
+process.on("SIGINT", () => server.close(() => process.exit(0)));

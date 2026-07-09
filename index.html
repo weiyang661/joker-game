@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>五人联机牌类游戏原型</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <main class="app">
+    <section class="topbar">
+      <div>
+        <h1>五人牌局原型</h1>
+        <p id="ruleNote">两副牌含大小王，原型按“去掉全部 3，共 100 张”发牌。</p>
+      </div>
+      <div class="topActions">
+        <button id="newGameBtn" class="primary">重新开始比赛</button>
+        <button id="nextRoundBtn">下一局</button>
+        <button id="autoBtn">人机替我出</button>
+      </div>
+    </section>
+
+    <section class="layout">
+      <aside class="panel scoreboard">
+        <h2>牌局</h2>
+        <div class="onlineBox">
+          <h2>联机</h2>
+          <div class="onlineGrid">
+            <input id="nameInput" placeholder="昵称">
+            <button id="renameBtn">改名</button>
+            <button id="hostBtn">开房</button>
+            <input id="roomInput" placeholder="房号">
+            <select id="seatSelect">
+              <option value="1">座位 1</option>
+              <option value="2">座位 2</option>
+              <option value="3">座位 3</option>
+              <option value="4">座位 4</option>
+            </select>
+            <button id="joinBtn">加入</button>
+            <button id="readyBtn">准备</button>
+            <button id="startOnlineBtn" class="wideBtn">开始本局</button>
+          </div>
+          <div id="onlineStatus" class="onlineStatus">本地人机模式</div>
+        </div>
+        <div class="scoreRows">
+          <div><span>本墩分</span><strong id="trickPoints">0</strong></div>
+          <div><span>王队分</span><strong id="kingScore">未公开</strong></div>
+          <div><span>平民分</span><strong id="plainScore">未公开</strong></div>
+          <div class="scoreListRow"><span>个人结算</span><strong id="matchScore" class="matchList">0 / 0 / 0 / 0 / 0</strong></div>
+        </div>
+        <div class="statusBox" id="statusBox"></div>
+        <div class="revealBox" id="revealBox"></div>
+      </aside>
+
+      <section class="tableWrap">
+        <div class="table" id="table">
+          <div class="tableCenter" id="tableCenter"></div>
+        </div>
+      </section>
+
+      <aside class="panel">
+        <h2>当前回合</h2>
+        <div id="currentPlay" class="currentPlay"></div>
+        <h2>记录</h2>
+        <div id="log" class="log"></div>
+      </aside>
+    </section>
+
+    <section class="handPanel">
+      <div class="handHeader">
+        <div>
+          <h2>你的手牌</h2>
+          <p id="selectionInfo">选择牌后会显示牌型。</p>
+        </div>
+        <div class="handActions">
+          <button id="playBtn" class="primary">出牌</button>
+          <button id="passBtn">过</button>
+          <button id="clearBtn">取消选择</button>
+        </div>
+      </div>
+      <div id="hand" class="hand"></div>
+    </section>
+  </main>
+
+  <script src="./game.js"></script>
+</body>
+</html>

@@ -756,13 +756,22 @@ function offerSnowChoiceOrEnd(message, winnerTeam) {
     return;
   }
   if (state.scores[rival] < 25) {
+    const deciders = unfinishedTeamPlayers(winnerTeam);
+    if (!deciders.length) {
+      endRound(`${message} ${teamName(winnerTeam)}已无人持牌决定雪，按无雪获胜。`, winnerTeam, 1);
+      return;
+    }
     state.pendingSnowChoice = { winnerTeam, message };
-    state.tableNotice = `${message} ${teamName(winnerTeam)}请选择雪或不雪`;
-    addLog(`${message} 对方未免雪，${teamName(winnerTeam)}选择雪或不雪。`);
+    state.tableNotice = `${message} ${teamName(winnerTeam)}未出完玩家请选择雪或不雪`;
+    addLog(`${message} 对方未免雪，${teamName(winnerTeam)}未出完玩家选择雪或不雪。`);
     render();
     return;
   }
   endRound(`${message} 对方已免雪，按无雪获胜。`, winnerTeam, 1);
+}
+
+function unfinishedTeamPlayers(team) {
+  return state.players.filter(player => player.team === team && !player.finished);
 }
 
 function chooseSnowChoice(choice) {
@@ -871,7 +880,8 @@ function maybeBotTurn() {
   if (!isHostRuntime()) return;
   if (state.revealPhase) return;
   if (state.pendingSnowChoice) {
-    const hasHumanWinner = state.players.some(player => player.team === state.pendingSnowChoice.winnerTeam && isHumanControlled(player.id));
+    const hasHumanWinner = unfinishedTeamPlayers(state.pendingSnowChoice.winnerTeam)
+      .some(player => isHumanControlled(player.id));
     if (!hasHumanWinner) setTimeout(() => chooseSnowChoice("snow"), 450);
     return;
   }
@@ -1061,7 +1071,7 @@ function renderTableCenter() {
     ? `<div class="settlementStrip">${state.lastSettlement.map(item => `<span>${item.name} 总分 ${item.total} 本局 ${formatSigned(item.delta)}</span>`).join("")}</div>`
     : "";
   const snowChoice = state.pendingSnowChoice
-    ? `<div class="centerLine"><strong>${teamName(state.pendingSnowChoice.winnerTeam)}</strong> 可选择雪或不雪</div>`
+    ? `<div class="centerLine"><strong>${teamName(state.pendingSnowChoice.winnerTeam)}</strong> 未出完玩家可选择雪或不雪</div>`
     : "";
   el.tableCenter.innerHTML = `
     <div class="phasePill">${phase}</div>
@@ -1258,7 +1268,7 @@ function renderRevealBox() {
   const human = localPlayer();
   if (state.pendingSnowChoice) {
     const pending = state.pendingSnowChoice;
-    if (human.team === pending.winnerTeam) {
+    if (human.team === pending.winnerTeam && !human.finished) {
       el.revealBox.innerHTML = `<p>${teamName(pending.winnerTeam)}已满足胜利条件，对方未免雪。</p>
         <div class="revealChoice">
           <button class="snowChoiceBtn" data-choice="snow">雪</button>
@@ -1269,7 +1279,7 @@ function renderRevealBox() {
       });
       return;
     }
-    el.revealBox.innerHTML = `等待${teamName(pending.winnerTeam)}选择雪或不雪。`;
+    el.revealBox.innerHTML = `等待${teamName(pending.winnerTeam)}未出完玩家选择雪或不雪。`;
     return;
   }
   if (online.connected && online.waitingRoom) {
@@ -1329,7 +1339,8 @@ function handleRevealChoice(count) {
 
 function handleSnowChoice(choice) {
   const pending = state.pendingSnowChoice;
-  if (!pending || localPlayer().team !== pending.winnerTeam) return;
+  const player = localPlayer();
+  if (!pending || player.team !== pending.winnerTeam || player.finished) return;
   if (online.connected && !online.isHost) {
     sendSocket({ type: "action", action: "snowChoice", choice });
     return;
@@ -1599,7 +1610,7 @@ function handleRemoteAction(clientId, message) {
     return;
   }
   if (message.action === "snowChoice") {
-    if (!state.pendingSnowChoice || player.team !== state.pendingSnowChoice.winnerTeam) return;
+    if (!state.pendingSnowChoice || player.team !== state.pendingSnowChoice.winnerTeam || player.finished) return;
     chooseSnowChoice(message.choice);
     return;
   }

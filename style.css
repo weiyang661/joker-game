@@ -365,6 +365,51 @@ body[data-menu="hidden"] .topActions button:not(#menuToggleBtn) {
   box-shadow: none;
 }
 
+.tablePlayLayer {
+  position: absolute;
+  left: 50%;
+  top: 42%;
+  transform: translate(-50%, -50%);
+  z-index: 22;
+  pointer-events: none;
+  width: min(760px, 68vw);
+  min-height: 124px;
+  display: grid;
+  justify-items: center;
+  align-content: center;
+}
+
+.tablePlayTitle {
+  display: inline-block;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: rgba(0,0,0,.48);
+  color: #ffe793;
+  font-size: 15px;
+  font-weight: 900;
+  text-shadow: 0 2px 4px rgba(0,0,0,.35);
+}
+
+.tablePlayCards {
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 0;
+  margin: 10px auto 0;
+  max-width: min(720px, 76vw);
+  min-height: 86px;
+}
+
+.tablePlayEmpty {
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(0,0,0,.22);
+  color: rgba(255,255,255,.78);
+  font-size: 15px;
+  font-weight: 800;
+}
+
 .phasePill {
   display: inline-block;
   padding: 4px 10px;

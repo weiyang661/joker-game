@@ -44,6 +44,7 @@ const el = {
   plainScore: document.querySelector("#plainScore"),
   matchScore: document.querySelector("#matchScore"),
   tableCenter: document.querySelector("#tableCenter"),
+  tablePlayLayer: document.querySelector("#tablePlayLayer"),
   currentPlay: document.querySelector("#currentPlay"),
   log: document.querySelector("#log"),
   playBtn: document.querySelector("#playBtn"),
@@ -1013,6 +1014,7 @@ function addLog(text) {
 
 function render() {
   renderTable();
+  renderTablePlayLayer();
   renderHand();
   renderPanels();
   broadcastSnapshot();
@@ -1077,7 +1079,7 @@ function renderTableCenter() {
     ? ""
     : `<div class="centerLine">轮到：<strong>${player?.name || "无"}</strong></div>`;
   const last = state.currentPlay
-    ? `<div class="tablePlayedName">${state.currentPlay.name}</div><div class="tablePlayedCards">${state.currentPlay.cards.map(tableCard).join("")}</div>`
+    ? `<div class="tablePlayedName">${state.currentPlay.name}</div>`
     : `<div class="tablePlayedName">新回合</div>`;
   const settlement = state.roundSettled
     ? `<div class="settlementStrip">${state.lastSettlement.map(item => `<span>${item.name} 总分 ${item.total} 本局 ${formatSigned(item.delta)}</span>`).join("")}</div>`
@@ -1094,6 +1096,23 @@ function renderTableCenter() {
     ${last}
     ${snowChoice}
     ${settlement}
+  `;
+}
+
+function renderTablePlayLayer() {
+  if (!el.tablePlayLayer) return;
+  if (online.connected && online.waitingRoom) {
+    el.tablePlayLayer.innerHTML = "";
+    return;
+  }
+  if (!state.currentPlay) {
+    el.tablePlayLayer.innerHTML = `<div class="tablePlayEmpty">新回合</div>`;
+    return;
+  }
+  const playerName = state.players[state.lastPlayer]?.name || "";
+  el.tablePlayLayer.innerHTML = `
+    <div class="tablePlayTitle">${playerName} · ${state.currentPlay.name}</div>
+    <div class="tablePlayCards">${state.currentPlay.cards.map(tableCard).join("")}</div>
   `;
 }
 

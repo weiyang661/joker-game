@@ -1109,11 +1109,11 @@ function revealedBigStatus(player) {
 
 function renderTable() {
   const positions = [
-    ["50%", "84%"],
-    ["14%", "58%"],
-    ["24%", "18%"],
-    ["76%", "18%"],
-    ["86%", "58%"]
+    ["15%", "88%"],
+    ["8%", "50%"],
+    ["50%", "13%"],
+    ["92%", "50%"],
+    ["85%", "88%"]
   ];
   el.table.innerHTML = state.players.map((player, index) => {
     const isTurn = index === state.current && (!state.gameOver || state.continuingForNextLead);
@@ -1129,7 +1129,7 @@ function renderTable() {
     const matchLine = player.roundDelta
       ? `总分 ${player.matchScore || 0} · 本局 ${formatSigned(player.roundDelta)}`
       : `总分 ${player.matchScore || 0}`;
-    return `<article class="seat" style="left:${positions[index][0]};top:${positions[index][1]}">
+    return `<article class="seat seat${index}" style="left:${positions[index][0]};top:${positions[index][1]}">
       <div class="scoreTag">${player.score} 分 · ${matchLine}</div>
       <div class="name">${isTurn ? "▶" : ""}${player.name}<span class="badge">${player.hand.length} 张</span></div>
       <div class="meta">${team}${player.finished ? " · 已出完" : ""}</div>
@@ -1175,9 +1175,11 @@ function renderHand() {
     const color = card.color === "red" ? " red" : card.color === "joker" ? " joker" : "";
     const yaoHint = hasYaoHint(human.hand) && (card.rank === "A" || card.rank === "4") ? " yaoHint" : "";
     const bigState = cardStateClass(card);
+    const pointBadge = card.points ? `<div class="pointBadge">分</div>` : "";
     return `<div class="card${selected}${color}${yaoHint}${bigState}" data-id="${card.id}">
       <div class="rank">${cardLabel(card)}</div>
       <div class="suit">${card.suit}</div>
+      ${pointBadge}
     </div>`;
   }).join("");
   el.hand.querySelectorAll(".card").forEach(node => {
@@ -1359,7 +1361,8 @@ function handleSnowChoice(choice) {
 
 function tinyCard(card) {
   const color = card.color === "red" ? " red" : card.color === "joker" ? " joker" : "";
-  return `<span class="tinyCard${color}${cardStateClass(card)}">${cardLabel(card)}</span>`;
+  const pointBadge = card.points ? `<em>分</em>` : "";
+  return `<span class="tinyCard${color}${cardStateClass(card)}">${cardLabel(card)}${pointBadge}</span>`;
 }
 
 function selectedCards() {

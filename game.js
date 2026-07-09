@@ -26,6 +26,8 @@ const state = {
   hasPlayed: false,
   revealPhase: true,
   bigRevealDecisions: new Set(),
+  pendingSnowChoice: null,
+  snowChasingTeam: null,
   tableNotice: "",
   log: []
 };
@@ -205,6 +207,8 @@ function setupWaitingRoom(options = {}) {
   state.hasPlayed = false;
   state.revealPhase = false;
   state.bigRevealDecisions = new Set();
+  state.pendingSnowChoice = null;
+  state.snowChasingTeam = null;
   state.tableNotice = "等待玩家加入并准备";
   state.lastSettlement = [];
   state.roundSettled = false;
@@ -281,6 +285,8 @@ function startGame(options = {}) {
   state.hasPlayed = false;
   state.revealPhase = true;
   state.bigRevealDecisions = new Set();
+  state.pendingSnowChoice = null;
+  state.snowChasingTeam = null;
   state.tableNotice = "等待持有大王的玩家选择亮王";
   state.lastSettlement = [];
   state.roundSettled = false;
@@ -582,6 +588,7 @@ function bombPower(play) {
 }
 
 function playCards(player, cards) {
+  if (state.pendingSnowChoice) return { ok: false, reason: "等待胜利阵营选择雪或不雪。" };
   const play = classify(cards);
   const beat = canBeat(play, state.currentPlay);
   if (!beat.ok) return beat;
@@ -620,7 +627,7 @@ function finishPlayer(player) {
     }
     addLog(`${player.name} 头跑。`);
     if (state.scores[player.team] >= 90) {
-      endRound(`${teamName(player.team)}头跑且达到 90 分，获胜。`, player.team, 1);
+      offerSnowChoiceOrEnd(`${teamName(player.team)}头跑且达到 90 分，已满足胜利条件。`, player.team);
       return;
     }
     addLog(`${teamName(player.team)}未达到 90 分，头跑不触发胜利，继续游戏。`);
@@ -630,6 +637,7 @@ function finishPlayer(player) {
 }
 
 function pass(player) {
+  if (state.pendingSnowChoice) return;
   if (!state.currentPlay) return;
   state.passes.add(player.id);
   player.lastPlay = { name: "过", cards: [] };
@@ -639,6 +647,7 @@ function pass(player) {
 }
 
 function nextTurn() {
+  if (state.pendingSnowChoice) return;
   if (state.gameOver && !state.continuingForNextLead) return;
   const active = state.players.filter(player => !player.finished);
   if (active.length <= 1) {
@@ -704,14 +713,20 @@ function findNextActive(fromId, predicate = () => true) {
 }
 
 function checkWin() {
+  if (state.pendingSnowChoice) return;
+  if (state.snowChasingTeam && state.scores[opponentTeam(state.snowChasingTeam)] >= 25) {
+    endRound(`${teamName(state.snowChasingTeam)}选择雪，但对方已免雪，按无雪获胜。`, state.snowChasingTeam, 1);
+    return;
+  }
   for (const team of ["king", "plain"]) {
     const rival = team === "king" ? "plain" : "king";
     if (state.scores[team] >= 200) {
       endRound(`${teamName(team)}拿满 200 分，大雪获胜。`, team, 4);
       return;
     }
+    if (state.snowChasingTeam && state.snowChasingTeam !== team) continue;
     if (state.scores[team] >= 140) {
-      endRound(`${teamName(team)}达到 140 分获胜。`, team, 1);
+      offerSnowChoiceOrEnd(`${teamName(team)}达到 140 分，已满足胜利条件。`, team);
       return;
     }
     const teamPlayers = state.players.filter(player => player.team === team);
@@ -723,8 +738,47 @@ function checkWin() {
   }
 }
 
+function offerSnowChoiceOrEnd(message, winnerTeam) {
+  const rival = opponentTeam(winnerTeam);
+  if (state.snowChasingTeam) {
+    if (state.scores[rival] >= 25) endRound(`${teamName(winnerTeam)}获胜，对方已免雪，按无雪结算。`, winnerTeam, 1);
+    return;
+  }
+  if (state.scores[rival] < 25) {
+    state.pendingSnowChoice = { winnerTeam, message };
+    state.tableNotice = `${message} ${teamName(winnerTeam)}请选择雪或不雪`;
+    addLog(`${message} 对方未免雪，${teamName(winnerTeam)}选择雪或不雪。`);
+    render();
+    return;
+  }
+  endRound(`${message} 对方已免雪，按无雪获胜。`, winnerTeam, 1);
+}
+
+function chooseSnowChoice(choice) {
+  const pending = state.pendingSnowChoice;
+  if (!pending) return;
+  const winnerTeam = pending.winnerTeam;
+  state.pendingSnowChoice = null;
+  if (choice === "noSnow") {
+    endRound(`${teamName(winnerTeam)}选择不雪，按无雪获胜。`, winnerTeam, 1);
+    render();
+    return;
+  }
+  state.snowChasingTeam = winnerTeam;
+  state.tableNotice = `${teamName(winnerTeam)}选择雪，继续游戏`;
+  addLog(`${teamName(winnerTeam)}选择雪，继续打到最终结果。`);
+  render();
+  maybeBotTurn();
+}
+
+function opponentTeam(team) {
+  return team === "king" ? "plain" : "king";
+}
+
 function endRound(message, winnerTeam = null, multiplier = 1) {
   if (state.gameOver) return;
+  state.pendingSnowChoice = null;
+  state.snowChasingTeam = null;
   state.gameOver = true;
   state.tableNotice = message;
   addLog(message);
@@ -780,6 +834,12 @@ function endGameByAllOut() {
     remaining.score += state.trickPoints;
     state.trickPoints = 0;
   }
+  if (state.snowChasingTeam && !state.roundSettled) {
+    const rivalScore = state.scores[opponentTeam(state.snowChasingTeam)];
+    const multiplier = rivalScore === 0 ? 4 : (rivalScore < 25 ? 2 : 1);
+    endRound(`${teamName(state.snowChasingTeam)}选择雪后打完，${multiplier === 4 ? "大雪" : multiplier === 2 ? "小雪" : "对方免雪"}。`, state.snowChasingTeam, multiplier);
+    return;
+  }
   if (state.continuingForNextLead && state.finishedOrder.length) {
     state.continuingForNextLead = false;
   }
@@ -799,6 +859,11 @@ function removeCards(hand, cards) {
 function maybeBotTurn() {
   if (!isHostRuntime()) return;
   if (state.revealPhase) return;
+  if (state.pendingSnowChoice) {
+    const hasHumanWinner = state.players.some(player => player.team === state.pendingSnowChoice.winnerTeam && isHumanControlled(player.id));
+    if (!hasHumanWinner) setTimeout(() => chooseSnowChoice("snow"), 450);
+    return;
+  }
   if (state.gameOver && !state.continuingForNextLead) return;
   const player = state.players[state.current];
   if (!player || isHumanControlled(player.id) || player.finished) return;
@@ -984,6 +1049,9 @@ function renderTableCenter() {
   const settlement = state.roundSettled
     ? `<div class="settlementStrip">${state.lastSettlement.map(item => `<span>${item.name} 总分 ${item.total} 本局 ${formatSigned(item.delta)}</span>`).join("")}</div>`
     : "";
+  const snowChoice = state.pendingSnowChoice
+    ? `<div class="centerLine"><strong>${teamName(state.pendingSnowChoice.winnerTeam)}</strong> 可选择雪或不雪</div>`
+    : "";
   el.tableCenter.innerHTML = `
     <div class="phasePill">${phase}</div>
     <div class="centerNotice">${state.tableNotice || "牌局进行中"}</div>
@@ -991,6 +1059,7 @@ function renderTableCenter() {
     <div class="centerLine">本墩分：<strong>${state.trickPoints}</strong></div>
     <div class="centerLine">牌局中剩余大王：<strong>${remainingBigCount()}</strong> 张</div>
     ${last}
+    ${snowChoice}
     ${settlement}
   `;
 }
@@ -1056,6 +1125,10 @@ function allKingPlayersKnown() {
   return kingPlayers.length > 0 && kingPlayers.every(player => player.knownTeam);
 }
 
+function allTeamsDetermined() {
+  return allKingPlayersKnown();
+}
+
 function renderHand() {
   const human = localPlayer();
   if (online.connected && online.waitingRoom) {
@@ -1099,7 +1172,7 @@ function renderSelection() {
   el.selectionInfo.textContent = play.valid
     ? `${play.name}：${beat.ok ? `可以出${playStrengthText(play)}` : beat.reason}`
     : play.reason;
-  const humanTurn = !state.revealPhase && state.current === localSeat() && (!state.gameOver || state.continuingForNextLead);
+  const humanTurn = !state.pendingSnowChoice && !state.revealPhase && state.current === localSeat() && (!state.gameOver || state.continuingForNextLead);
   el.playBtn.disabled = !humanTurn || !beat.ok || !cards.length;
   el.passBtn.disabled = !humanTurn || !state.currentPlay;
 }
@@ -1135,7 +1208,7 @@ function renderPanels() {
   el.startOnlineBtn.disabled = !online.connected || !online.isHost || !online.waitingRoom || !allJoinedPlayersReady();
   el.autoBtn.disabled = online.waitingRoom || online.connected && !online.isHost || state.revealPhase || (state.gameOver && !state.continuingForNextLead) || state.current !== localSeat();
   el.trickPoints.textContent = state.trickPoints;
-  const revealTeamScores = state.roundSettled || (state.gameOver && !state.continuingForNextLead);
+  const revealTeamScores = state.roundSettled || (state.gameOver && !state.continuingForNextLead) || allTeamsDetermined();
   el.kingScore.textContent = revealTeamScores ? state.scores.king : "未公开";
   el.plainScore.textContent = revealTeamScores ? state.scores.plain : "未公开";
   el.matchScore.innerHTML = state.players
@@ -1169,6 +1242,22 @@ function normalizeScores() {
 
 function renderRevealBox() {
   const human = localPlayer();
+  if (state.pendingSnowChoice) {
+    const pending = state.pendingSnowChoice;
+    if (human.team === pending.winnerTeam) {
+      el.revealBox.innerHTML = `<p>${teamName(pending.winnerTeam)}已满足胜利条件，对方未免雪。</p>
+        <div class="revealChoice">
+          <button class="snowChoiceBtn" data-choice="snow">雪</button>
+          <button class="snowChoiceBtn" data-choice="noSnow">不雪</button>
+        </div>`;
+      el.revealBox.querySelectorAll(".snowChoiceBtn").forEach(button => {
+        button.addEventListener("click", () => handleSnowChoice(button.dataset.choice));
+      });
+      return;
+    }
+    el.revealBox.innerHTML = `等待${teamName(pending.winnerTeam)}选择雪或不雪。`;
+    return;
+  }
   if (online.connected && online.waitingRoom) {
     el.revealBox.innerHTML = "房间准备中，所有已入房真人准备后由房主开始发牌。";
     return;
@@ -1222,6 +1311,16 @@ function handleRevealChoice(count) {
     return;
   }
   decidePlayerBigReveal(localPlayer(), count);
+}
+
+function handleSnowChoice(choice) {
+  const pending = state.pendingSnowChoice;
+  if (!pending || localPlayer().team !== pending.winnerTeam) return;
+  if (online.connected && !online.isHost) {
+    sendSocket({ type: "action", action: "snowChoice", choice });
+    return;
+  }
+  chooseSnowChoice(choice);
 }
 
 function tinyCard(card) {
@@ -1483,6 +1582,11 @@ function handleRemoteAction(clientId, message) {
   if (message.action === "ready") {
     if (!online.waitingRoom) return;
     setSeatReady(seat, !!message.ready);
+    return;
+  }
+  if (message.action === "snowChoice") {
+    if (!state.pendingSnowChoice || player.team !== state.pendingSnowChoice.winnerTeam) return;
+    chooseSnowChoice(message.choice);
     return;
   }
   if (message.action === "reveal") {

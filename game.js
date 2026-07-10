@@ -49,6 +49,7 @@ const el = {
   log: document.querySelector("#log"),
   playBtn: document.querySelector("#playBtn"),
   passBtn: document.querySelector("#passBtn"),
+  teammateBtn: document.querySelector("#teammateBtn"),
   clearBtn: document.querySelector("#clearBtn"),
   gameMenu: document.querySelector("#gameMenu"),
   menuDragHandle: document.querySelector("#menuDragHandle"),
@@ -86,6 +87,7 @@ let menuMode = "full";
 let menuScale = 1;
 let menuPosition = { left: 18, top: 62 };
 let menuDragging = null;
+let teammateView = false;
 
 function shuffle(list) {
   const copy = [...list];
@@ -619,6 +621,7 @@ function bombPower(play) {
 }
 
 function playCards(player, cards) {
+  if (player.finished) return { ok: false, reason: "你已经出完手牌。" };
   if (state.pendingSnowChoice) return { ok: false, reason: "等待胜利阵营选择雪或不雪。" };
   if (!state.currentPlay) clearCurrentTrickPlays();
   const play = classify(cards);
@@ -674,6 +677,7 @@ function finishPlayer(player) {
 
 function pass(player) {
   if (state.pendingSnowChoice) return;
+  if (player.finished) return;
   if (!state.currentPlay) return;
   state.passes.add(player.id);
   player.lastPlay = { name: "过", cards: [] };
@@ -1232,6 +1236,19 @@ function renderHand() {
     renderSelection();
     return;
   }
+  if (human.finished) {
+    state.selected.clear();
+    if (!canViewTeammateHands()) teammateView = false;
+    el.hand.innerHTML = teammateView
+      ? teammateHandsHtml(human)
+      : `<div class="finishedView">
+          <strong>你已出完手牌</strong>
+          <span>${allTeamsDetermined() ? "可以查看同阵营玩家的手牌。" : "阵营未明确，暂时不能查看队友牌。"}</span>
+        </div>`;
+    renderSelection();
+    return;
+  }
+  teammateView = false;
   sortHand(human.hand);
   el.hand.innerHTML = human.hand.map(card => {
     const selected = state.selected.has(card.id) ? " selected" : "";
@@ -1257,11 +1274,53 @@ function renderHand() {
   renderSelection();
 }
 
+function canViewTeammateHands() {
+  const human = localPlayer();
+  return !!human?.finished && allTeamsDetermined() && !online.waitingRoom;
+}
+
+function teammateHandsHtml(human) {
+  const teammates = state.players.filter(player => player.id !== human.id && player.team === human.team);
+  if (!teammates.length) {
+    return `<div class="finishedView"><strong>没有队友可查看</strong></div>`;
+  }
+  return `<div class="teammateHands">${teammates.map(player => {
+    const cards = [...player.hand];
+    sortHand(cards);
+    const hand = cards.length
+      ? cards.map(tinyCard).join("")
+      : `<span class="emptyHand">已出完</span>`;
+    return `<section class="teammateHand">
+      <strong>${player.name}<em>${player.hand.length} 张</em></strong>
+      <div class="teammateCards">${hand}</div>
+    </section>`;
+  }).join("")}</div>`;
+}
+
 function renderSelection() {
   if (online.connected && online.waitingRoom) {
     el.selectionInfo.textContent = "房间准备中，开始本局后才会发牌。";
     el.playBtn.disabled = true;
     el.passBtn.disabled = true;
+    el.clearBtn.disabled = true;
+    el.teammateBtn.disabled = true;
+    el.teammateBtn.hidden = true;
+    return;
+  }
+  const human = localPlayer();
+  const canSeeTeammates = canViewTeammateHands();
+  el.teammateBtn.hidden = !human.finished;
+  el.teammateBtn.disabled = human.finished && !canSeeTeammates;
+  el.teammateBtn.textContent = human.finished
+    ? (canSeeTeammates ? (teammateView ? "返回自己视角" : "查看队友牌") : "阵营未明确")
+    : "查看队友牌";
+  if (human.finished) {
+    el.selectionInfo.textContent = canSeeTeammates
+      ? (teammateView ? "正在查看队友牌。" : "你已出完，可以查看队友牌。")
+      : "你已出完。阵营未明确前不能查看队友牌。";
+    el.playBtn.disabled = true;
+    el.passBtn.disabled = true;
+    el.clearBtn.disabled = true;
     return;
   }
   const cards = selectedCards();
@@ -1270,9 +1329,10 @@ function renderSelection() {
   el.selectionInfo.textContent = play.valid
     ? `${play.name}：${beat.ok ? `可以出${playStrengthText(play)}` : beat.reason}`
     : play.reason;
-  const humanTurn = !state.pendingSnowChoice && !state.revealPhase && state.current === localSeat() && (!state.gameOver || state.continuingForNextLead);
+  const humanTurn = !human.finished && !state.pendingSnowChoice && !state.revealPhase && state.current === localSeat() && (!state.gameOver || state.continuingForNextLead);
   el.playBtn.disabled = !humanTurn || !beat.ok || !cards.length;
   el.passBtn.disabled = !humanTurn || !state.currentPlay;
+  el.clearBtn.disabled = false;
 }
 
 function playStrengthText(play) {
@@ -1443,6 +1503,7 @@ function selectedCards() {
 }
 
 el.playBtn.addEventListener("click", () => {
+  if (localPlayer().finished) return;
   if (online.connected && !online.isHost) {
     sendSocket({ type: "action", action: "play", cardIds: selectedCards().map(card => card.id) });
     state.selected.clear();
@@ -1456,6 +1517,7 @@ el.playBtn.addEventListener("click", () => {
 });
 
 el.passBtn.addEventListener("click", () => {
+  if (localPlayer().finished) return;
   if (online.connected && !online.isHost) {
     sendSocket({ type: "action", action: "pass" });
     state.selected.clear();
@@ -1469,6 +1531,12 @@ el.passBtn.addEventListener("click", () => {
 
 el.clearBtn.addEventListener("click", () => {
   state.selected.clear();
+  renderHand();
+});
+
+el.teammateBtn.addEventListener("click", () => {
+  if (!canViewTeammateHands()) return;
+  teammateView = !teammateView;
   renderHand();
 });
 
@@ -1755,12 +1823,12 @@ function handleRemoteAction(clientId, message) {
     return;
   }
   if (message.action === "pass") {
-    if (state.current === seat) pass(player);
+    if (state.current === seat && !player.finished) pass(player);
     render();
     return;
   }
   if (message.action === "play") {
-    if (state.current !== seat) return;
+    if (state.current !== seat || player.finished) return;
     const ids = new Set(message.cardIds || []);
     const cards = player.hand.filter(card => ids.has(card.id));
     playCards(player, cards);

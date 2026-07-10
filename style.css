@@ -760,6 +760,10 @@ body[data-menu="hidden"] .topActions button:not(#menuToggleBtn) {
   min-width: 74px;
 }
 
+#teammateBtn[hidden] {
+  display: none;
+}
+
 #playBtn {
   min-width: 164px;
   min-height: 58px;
@@ -855,6 +859,61 @@ body[data-menu="hidden"] .topActions button:not(#menuToggleBtn) {
 
 .card.red { color: var(--red); }
 .card.joker { color: var(--blue); }
+
+.finishedView {
+  width: 100%;
+  min-height: 104px;
+  display: grid;
+  place-content: center;
+  gap: 8px;
+  text-align: center;
+  color: rgba(255,255,255,.82);
+}
+
+.finishedView strong {
+  color: #fff7d4;
+  font-size: 22px;
+}
+
+.teammateHands {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 10px;
+  align-items: stretch;
+}
+
+.teammateHand {
+  min-width: 0;
+  padding: 9px;
+  border-radius: 8px;
+  background: rgba(0,0,0,.24);
+  border: 1px solid rgba(255,255,255,.12);
+}
+
+.teammateHand strong {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 7px;
+  color: #fff7d4;
+}
+
+.teammateHand em {
+  font-style: normal;
+  color: rgba(255,255,255,.72);
+}
+
+.teammateCards {
+  display: flex;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  padding: 3px 0 4px;
+}
+
+.emptyHand {
+  color: rgba(255,255,255,.65);
+}
 
 .revealChoice {
   display: grid;

@@ -1030,6 +1030,30 @@ function cardStateClass(card) {
   return "";
 }
 
+function jokerKindClass(card) {
+  if (card?.joker === "big") return " bigJoker";
+  if (card?.joker === "small") return " smallJoker";
+  return "";
+}
+
+function jokerFaceHtml(card) {
+  const title = card.joker === "small" ? "小王" : cardLabel(card);
+  return `<div class="jokerFace">
+    <span class="jokerWord jokerWordLeft">JOKER</span>
+    <span class="jokerTitle">${title}</span>
+    <span class="jokerConfetti confettiOne"></span>
+    <span class="jokerConfetti confettiTwo"></span>
+    <span class="jokerConfetti confettiThree"></span>
+    <span class="jokerFigure">
+      <span class="jokerHat"></span>
+      <span class="jokerHead"></span>
+      <span class="jokerBody"></span>
+      <span class="jokerLegs"></span>
+    </span>
+    <span class="jokerWord jokerWordRight">JOKER</span>
+  </div>`;
+}
+
 function addLog(text) {
   state.log.unshift(text);
   state.log = state.log.slice(0, 80);
@@ -1255,10 +1279,17 @@ function renderHand() {
     const color = card.color === "red" ? " red" : card.color === "joker" ? " joker" : "";
     const yaoHint = hasYaoHint(human.hand) && (card.rank === "A" || card.rank === "4") ? " yaoHint" : "";
     const bigState = cardStateClass(card);
+    const jokerKind = jokerKindClass(card);
     const pointBadge = card.points ? `<div class="pointBadge">分</div>` : "";
+    if (card.joker) {
+      return `<div class="card${selected} joker${bigState}${jokerKind}" data-id="${card.id}">
+        ${jokerFaceHtml(card)}
+      </div>`;
+    }
     return `<div class="card${selected}${color}${yaoHint}${bigState}" data-id="${card.id}" data-suit="${card.suit}">
-      <div class="rank">${cardLabel(card)}</div>
+      <div class="cardCorner cardCornerTop"><span>${cardLabel(card)}</span><i>${card.suit}</i></div>
       <div class="suit">${card.suit}</div>
+      <div class="cardCorner cardCornerBottom"><span>${cardLabel(card)}</span><i>${card.suit}</i></div>
       ${pointBadge}
     </div>`;
   }).join("");
@@ -1487,14 +1518,28 @@ function handleSnowChoice(choice) {
 
 function tinyCard(card) {
   const color = card.color === "red" ? " red" : card.color === "joker" ? " joker" : "";
+  const jokerKind = jokerKindClass(card);
   const pointBadge = card.points ? `<em>分</em>` : "";
-  return `<span class="tinyCard${color}${cardStateClass(card)}">${cardLabel(card)}${pointBadge}</span>`;
+  if (card.joker) {
+    const label = card.joker === "small" ? "小王" : cardLabel(card);
+    return `<span class="tinyCard${color}${cardStateClass(card)}${jokerKind}"><small>JOKER</small>${label}</span>`;
+  }
+  return `<span class="tinyCard${color}${cardStateClass(card)}${jokerKind}">${cardLabel(card)}${pointBadge}</span>`;
 }
 
 function tableCard(card) {
   const color = card.color === "red" ? " red" : card.color === "joker" ? " joker" : "";
+  const jokerKind = jokerKindClass(card);
   const pointBadge = card.points ? `<em>分</em>` : "";
-  return `<span class="tableCard${color}${cardStateClass(card)}"><b>${cardLabel(card)}</b><i>${card.suit}</i>${pointBadge}</span>`;
+  if (card.joker) {
+    return `<span class="tableCard${color}${cardStateClass(card)}${jokerKind}">${jokerFaceHtml(card)}</span>`;
+  }
+  return `<span class="tableCard${color}${cardStateClass(card)}">
+    <span class="tableCorner tableCornerTop"><b>${cardLabel(card)}</b><i>${card.suit}</i></span>
+    <i class="tableSuit">${card.suit}</i>
+    <span class="tableCorner tableCornerBottom"><b>${cardLabel(card)}</b><i>${card.suit}</i></span>
+    ${pointBadge}
+  </span>`;
 }
 
 function selectedCards() {

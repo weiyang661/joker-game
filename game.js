@@ -1138,10 +1138,10 @@ function renderTablePlayLayer() {
   }
   const slots = [
     ["50%", "66%"],
-    ["24%", "51%"],
-    ["50%", "34%"],
-    ["76%", "51%"],
-    ["68%", "63%"]
+    ["31%", "55%"],
+    ["43%", "37%"],
+    ["62%", "37%"],
+    ["75%", "55%"]
   ];
   el.tablePlayLayer.innerHTML = state.players.map((player, index) => {
     const slotIndex = relativeSeatIndex(index);
@@ -1171,10 +1171,10 @@ function revealedBigStatus(player) {
 function renderTable() {
   const positions = [
     ["50%", "78%"],
-    ["14%", "55%"],
-    ["50%", "15%"],
-    ["86%", "55%"],
-    ["76%", "78%"]
+    ["18%", "58%"],
+    ["40%", "18%"],
+    ["62%", "18%"],
+    ["84%", "58%"]
   ];
   const seats = state.players.map((player, index) => {
     const seatIndex = relativeSeatIndex(index);

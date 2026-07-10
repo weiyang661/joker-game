@@ -1289,7 +1289,6 @@ function renderHand() {
     return `<div class="card${selected}${color}${yaoHint}${bigState}" data-id="${card.id}" data-suit="${card.suit}">
       <div class="cardCorner cardCornerTop"><span>${cardLabel(card)}</span><i>${card.suit}</i></div>
       <div class="suit">${card.suit}</div>
-      <div class="cardCorner cardCornerBottom"><span>${cardLabel(card)}</span><i>${card.suit}</i></div>
       ${pointBadge}
     </div>`;
   }).join("");
@@ -1537,7 +1536,6 @@ function tableCard(card) {
   return `<span class="tableCard${color}${cardStateClass(card)}">
     <span class="tableCorner tableCornerTop"><b>${cardLabel(card)}</b><i>${card.suit}</i></span>
     <i class="tableSuit">${card.suit}</i>
-    <span class="tableCorner tableCornerBottom"><b>${cardLabel(card)}</b><i>${card.suit}</i></span>
     ${pointBadge}
   </span>`;
 }

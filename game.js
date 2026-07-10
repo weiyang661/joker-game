@@ -64,10 +64,14 @@ const el = {
   readyBtn: document.querySelector("#readyBtn"),
   startOnlineBtn: document.querySelector("#startOnlineBtn"),
   renameBtn: document.querySelector("#renameBtn"),
+  inviteBtn: document.querySelector("#inviteBtn"),
   nameInput: document.querySelector("#nameInput"),
   roomInput: document.querySelector("#roomInput"),
   seatSelect: document.querySelector("#seatSelect"),
-  onlineStatus: document.querySelector("#onlineStatus")
+  onlineStatus: document.querySelector("#onlineStatus"),
+  joinOverlay: document.querySelector("#joinOverlay"),
+  joinOverlayTitle: document.querySelector("#joinOverlayTitle"),
+  joinOverlayText: document.querySelector("#joinOverlayText")
 };
 
 const online = {
@@ -80,7 +84,13 @@ const online = {
   seatClients: {},
   clientSeats: {},
   readySeats: {},
-  waitingRoom: false
+  waitingRoom: false,
+  joining: false,
+  hasSnapshot: false,
+  snapshotQueued: false,
+  pendingSnapshot: null,
+  connectionPromise: null,
+  pendingRole: ""
 };
 
 let menuMode = "full";
@@ -162,6 +172,10 @@ function relativeSeatIndex(seat) {
 
 function isHostRuntime() {
   return !online.connected || online.isHost;
+}
+
+function isOnlineRoomMember() {
+  return online.connected && !!online.roomId;
 }
 
 function isHumanControlled(seat) {
@@ -774,6 +788,10 @@ function checkWin() {
       endRound(`已有头跑且 200 分已全部分完，${teamName(team)}达到 180 分，直接小雪。`, team, 2);
       return;
     }
+    if (!state.snowChasingTeam && headRunnerTeam() === team && state.scores[team] >= 90) {
+      offerSnowChoiceOrEnd(`${teamName(team)}已有头跑且达到 90 分，已满足胜利条件。`, team);
+      return;
+    }
     if (state.snowChasingTeam && state.snowChasingTeam !== team) continue;
     if (state.scores[team] >= 140) {
       offerSnowChoiceOrEnd(`${teamName(team)}达到 140 分，已满足胜利条件。`, team);
@@ -790,6 +808,11 @@ function checkWin() {
 
 function hasAnyHeadRunner() {
   return state.finishedOrder.length > 0;
+}
+
+function headRunnerTeam() {
+  const first = state.players[state.finishedOrder[0]];
+  return first?.team || null;
 }
 
 function allPointsAwarded() {
@@ -835,6 +858,15 @@ function chooseSnowChoice(choice) {
   state.snowChasingTeam = winnerTeam;
   state.tableNotice = `${teamName(winnerTeam)}选择雪，继续游戏`;
   addLog(`${teamName(winnerTeam)}选择雪，继续打到最终结果。`);
+  if (state.players[state.current]?.finished) {
+    if (state.currentPlay && !anyActivePlayerCanBeatCurrentPlay()) {
+      addLog(`${state.players[state.current].name}已出完，且无人能管最后出的${state.currentPlay.name}，直接交出牌权。`);
+      awardTrick();
+      return;
+    }
+    nextTurn();
+    return;
+  }
   render();
   maybeBotTurn();
 }
@@ -954,6 +986,13 @@ function chooseMove(player) {
     return legal.find(item => item.play.type !== "bomb")?.cards || legal[0]?.cards || [];
   }
   return legal[0]?.cards || [];
+}
+
+function anyActivePlayerCanBeatCurrentPlay() {
+  if (!state.currentPlay) return true;
+  return state.players
+    .filter(player => !player.finished && player.id !== state.lastPlayer)
+    .some(player => generateMoves(player.hand).some(cards => canBeat(classify(cards), state.currentPlay).ok));
 }
 
 function moveCost(play) {
@@ -1105,6 +1144,45 @@ function serializeState() {
 function loadState(serialized) {
   const next = JSON.parse(serialized, (key, value) => value && value.__set ? new Set(value.__set) : value);
   Object.assign(state, next);
+}
+
+function setJoining(active, title = "正在加入房间", text = "正在连接服务器并等待房主同步牌局...") {
+  online.joining = !!active;
+  document.body.dataset.joining = active ? "true" : "false";
+  if (el.joinOverlayTitle) el.joinOverlayTitle.textContent = title;
+  if (el.joinOverlayText) el.joinOverlayText.textContent = text;
+  if (el.hostBtn) el.hostBtn.disabled = !!active || isOnlineRoomMember();
+  if (el.joinBtn) el.joinBtn.disabled = !!active || isOnlineRoomMember();
+}
+
+function scheduleSnapshotApply(message) {
+  online.pendingSnapshot = message;
+  if (online.snapshotQueued) return;
+  online.snapshotQueued = true;
+  requestAnimationFrame(() => {
+    online.snapshotQueued = false;
+    const snapshot = online.pendingSnapshot;
+    online.pendingSnapshot = null;
+    if (!snapshot) return;
+    applySnapshot(snapshot);
+  });
+}
+
+function applySnapshot(message) {
+  const previousSeat = online.seat;
+  loadState(message.state);
+  online.seat = message.seat;
+  online.roomId = message.roomId || online.roomId;
+  online.waitingRoom = !!message.waitingRoom;
+  online.readySeats = message.readySeats || {};
+  online.hasSnapshot = true;
+  if (state.players[online.seat] && !el.nameInput.value.trim()) el.nameInput.value = state.players[online.seat].name;
+  if (previousSeat && previousSeat !== online.seat) {
+    state.tableNotice = `你选择的座位已占用，已自动进入座位 ${online.seat}`;
+  }
+  setJoining(false);
+  render();
+  updateOnlineStatus();
 }
 
 function broadcastSnapshot() {
@@ -1478,6 +1556,9 @@ function renderPanels() {
   el.readyBtn.disabled = !online.connected || !online.waitingRoom;
   el.readyBtn.textContent = online.readySeats[localSeat()] ? "取消准备" : "准备";
   el.startOnlineBtn.disabled = !online.connected || !online.isHost || !online.waitingRoom || !allJoinedPlayersReady();
+  if (el.inviteBtn) el.inviteBtn.disabled = !online.connected || !online.isHost || !online.roomId;
+  if (el.hostBtn) el.hostBtn.disabled = online.joining || isOnlineRoomMember();
+  if (el.joinBtn) el.joinBtn.disabled = online.joining || isOnlineRoomMember();
   el.autoBtn.disabled = online.waitingRoom || online.connected && !online.isHost || state.revealPhase || (state.gameOver && !state.continuingForNextLead) || state.current !== localSeat();
   el.trickPoints.textContent = state.trickPoints;
   const revealTeamScores = state.roundSettled || (state.gameOver && !state.continuingForNextLead) || allTeamsDetermined();
@@ -1766,35 +1847,58 @@ el.readyBtn.addEventListener("click", () => {
 });
 
 el.hostBtn.addEventListener("click", async () => {
-  await openSocket();
+  if (isOnlineRoomMember()) {
+    updateOnlineStatus("你已经在房间中，刷新页面后才能重新开房");
+    return;
+  }
+  setJoining(true, "正在开房", "正在连接联机服务器...");
+  try {
+    await openSocket();
+  } catch {
+    setJoining(false);
+    return;
+  }
   online.isHost = true;
   online.seat = 0;
+  online.hasSnapshot = true;
   state.players[0].name = cleanPlayerName(el.nameInput.value, "房主");
   online.waitingRoom = true;
+  online.pendingRole = "host";
   sendSocket({ type: "create" });
+  setJoining(false);
   render();
 });
 
 el.joinBtn.addEventListener("click", async () => {
+  if (online.joining) return;
+  if (isOnlineRoomMember()) {
+    updateOnlineStatus("你已经在房间中，刷新页面后才能加入其他房间");
+    return;
+  }
   const roomId = el.roomInput.value.trim().toUpperCase();
   if (!roomId) {
     el.onlineStatus.textContent = "请输入房号";
     return;
   }
-  await openSocket();
+  setJoining(true, "正在加入房间", "正在连接服务器...");
+  try {
+    await openSocket();
+  } catch {
+    setJoining(false);
+    return;
+  }
   online.isHost = false;
   const requestedSeat = Number(el.seatSelect.value);
   online.seat = requestedSeat;
+  online.roomId = roomId;
   const name = cleanPlayerName(el.nameInput.value, `玩家 ${requestedSeat}`);
   online.waitingRoom = true;
   online.readySeats = {};
-  setupWaitingRoom({ preserveNames: { [requestedSeat]: name } });
-  state.players[requestedSeat].human = true;
-  state.players[requestedSeat].name = name;
-  state.tableNotice = "正在加入房间...";
+  online.hasSnapshot = false;
+  online.pendingRole = "join";
   sendSocket({ type: "join", roomId, seat: requestedSeat, name });
-  el.onlineStatus.textContent = "正在加入房间...";
-  render();
+  updateOnlineStatus("正在加入房间，等待房主同步牌局...");
+  setJoining(true, "已发送加入请求", "等待房主同步牌局，请不要重复点击。");
 });
 
 el.renameBtn.addEventListener("click", () => {
@@ -1807,6 +1911,20 @@ el.renameBtn.addEventListener("click", () => {
   render();
 });
 
+el.inviteBtn.addEventListener("click", async () => {
+  if (!online.roomId) {
+    el.onlineStatus.textContent = "先开房，再复制邀请链接";
+    return;
+  }
+  const url = inviteUrl(online.roomId);
+  try {
+    await navigator.clipboard.writeText(url);
+    el.onlineStatus.textContent = `邀请链接已复制：${url}`;
+  } catch {
+    window.prompt("复制这个邀请链接发给朋友：", url);
+  }
+});
+
 function renameSeat(seat, name) {
   const player = state.players[seat];
   if (!player) return;
@@ -1814,40 +1932,72 @@ function renameSeat(seat, name) {
   state.tableNotice = `${player.name} 更新了昵称`;
 }
 
+function inviteUrl(roomId) {
+  const url = new URL(window.location.href);
+  url.searchParams.set("room", roomId);
+  return url.toString();
+}
+
 function openSocket() {
   if (online.socket && online.socket.readyState === WebSocket.OPEN) return Promise.resolve();
-  return new Promise((resolve, reject) => {
+  if (online.connectionPromise) return online.connectionPromise;
+  online.connectionPromise = new Promise((resolve, reject) => {
     const protocol = location.protocol === "https:" ? "wss:" : "ws:";
     const socket = new WebSocket(`${protocol}//${location.host}`);
     online.socket = socket;
+    const clearPromise = () => {
+      if (online.socket === socket) online.connectionPromise = null;
+    };
     socket.addEventListener("open", () => {
       online.connected = true;
       updateOnlineStatus();
+      clearPromise();
       resolve();
     }, { once: true });
-    socket.addEventListener("message", event => handleSocketMessage(JSON.parse(event.data)));
+    socket.addEventListener("message", event => {
+      try {
+        handleSocketMessage(JSON.parse(event.data));
+      } catch {
+        updateOnlineStatus("收到异常联机消息，已忽略");
+      }
+    });
     socket.addEventListener("close", () => {
       online.connected = false;
+      online.pendingRole = "";
+      setJoining(false);
+      clearPromise();
       updateOnlineStatus("联机已断开");
     });
     socket.addEventListener("error", () => {
-      updateOnlineStatus("连接失败，请确认已启动 outputs/server.js");
+      online.pendingRole = "";
+      setJoining(false);
+      clearPromise();
+      updateOnlineStatus("连接失败，请刷新后重试，或等待 Render 服务唤醒");
       reject(new Error("socket failed"));
     }, { once: true });
   });
+  return online.connectionPromise;
 }
 
 function handleSocketMessage(message) {
   if (message.type === "created") {
+    if (online.pendingRole !== "host") {
+      updateOnlineStatus("忽略了一条异常开房回执，当前身份保持不变");
+      return;
+    }
+    online.pendingRole = "";
     online.roomId = message.roomId;
     online.clientId = message.clientId;
     online.connected = true;
     online.isHost = true;
     online.seat = 0;
+    online.hasSnapshot = true;
     online.seatClients = {};
     online.clientSeats = {};
     online.readySeats = {};
     online.waitingRoom = true;
+    if (el.roomInput) el.roomInput.value = online.roomId;
+    history.replaceState(null, "", inviteUrl(online.roomId));
     setupWaitingRoom({ resetMatch: true, preserveNames: { 0: cleanPlayerName(el.nameInput.value, "房主") } });
     state.tableNotice = `房间 ${online.roomId} 已创建，等待玩家加入`;
     addLog(`房间 ${online.roomId} 已创建，所有已入房玩家准备后再发牌。`);
@@ -1856,11 +2006,17 @@ function handleSocketMessage(message) {
     return;
   }
   if (message.type === "joined") {
+    if (online.pendingRole !== "join") {
+      updateOnlineStatus("忽略了一条异常加入回执，当前身份保持不变");
+      return;
+    }
+    online.pendingRole = "";
     online.roomId = message.roomId;
     online.clientId = message.clientId;
     online.connected = true;
     online.isHost = false;
     updateOnlineStatus("已加入，等待房主同步牌局");
+    setJoining(true, "已加入房间", "等待房主同步牌局...");
     return;
   }
   if (message.type === "joinRequest" && online.isHost) {
@@ -1903,21 +2059,19 @@ function handleSocketMessage(message) {
     return;
   }
   if (message.type === "snapshot") {
-    const previousSeat = online.seat;
-    loadState(message.state);
-    online.seat = message.seat;
-    online.roomId = message.roomId || online.roomId;
-    online.waitingRoom = !!message.waitingRoom;
-    online.readySeats = message.readySeats || {};
-    if (state.players[online.seat] && !el.nameInput.value.trim()) el.nameInput.value = state.players[online.seat].name;
-    if (previousSeat && previousSeat !== online.seat) {
-      state.tableNotice = `你选择的座位已占用，已自动进入座位 ${online.seat}`;
+    if (!online.isHost && Number(message.seat) === 0) {
+      setJoining(false);
+      updateOnlineStatus("收到异常座位同步，已拒绝切换到房主视角，请刷新后重新加入");
+      return;
     }
-    render();
-    updateOnlineStatus();
+    scheduleSnapshotApply(message);
     return;
   }
-  if (message.type === "error") updateOnlineStatus(message.message);
+  if (message.type === "error") {
+    online.pendingRole = "";
+    setJoining(false);
+    updateOnlineStatus(message.message);
+  }
 }
 
 function handleRemoteAction(clientId, message) {
@@ -1977,4 +2131,13 @@ function updateOnlineStatus(extra = "") {
   }
 }
 
+function initInviteParams() {
+  const params = new URLSearchParams(window.location.search);
+  const room = String(params.get("room") || "").trim().toUpperCase();
+  if (!room) return;
+  el.roomInput.value = room;
+  el.onlineStatus.textContent = `已识别邀请房号 ${room}，输入昵称后点“加入”。`;
+}
+
 startGame({ resetMatch: true });
+initInviteParams();

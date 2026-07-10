@@ -6,7 +6,7 @@ const path = require("path");
 const root = __dirname;
 const rooms = new Map();
 const startedAt = Date.now();
-const version = "2026-07-09-ws-fragment-fix";
+const version = "2026-07-11-room-role-lock";
 
 const server = http.createServer((req, res) => {
   const urlPath = decodeURIComponent(req.url.split("?")[0]);
@@ -140,6 +140,10 @@ function handleTextPayload(client, payload) {
 
 function handleMessage(client, message) {
   if (message.type === "create") {
+    if (client.roomId) {
+      send(client, { type: "error", message: "你已经在房间中，刷新页面后才能重新开房" });
+      return;
+    }
     leave(client);
     const roomId = newRoomId();
     rooms.set(roomId, { host: client, clients: new Map([[client.id, client]]) });
@@ -149,6 +153,10 @@ function handleMessage(client, message) {
     return;
   }
   if (message.type === "join") {
+    if (client.roomId) {
+      send(client, { type: "error", message: "你已经在房间中，刷新页面后才能加入其他房间" });
+      return;
+    }
     leave(client);
     const room = rooms.get(String(message.roomId || "").toUpperCase());
     if (!room) return send(client, { type: "error", message: "房间不存在" });

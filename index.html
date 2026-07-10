@@ -44,6 +44,7 @@
               <option value="4">座位 4</option>
             </select>
             <button id="joinBtn">加入</button>
+            <button id="inviteBtn" class="wideBtn">复制邀请链接</button>
             <button id="readyBtn">准备</button>
             <button id="startOnlineBtn" class="wideBtn">开始本局</button>
           </div>
@@ -87,6 +88,14 @@
         </div>
       </div>
       <div id="hand" class="hand"></div>
+    </section>
+
+    <section id="joinOverlay" class="joinOverlay" aria-live="polite">
+      <div class="joinCard">
+        <div class="joinSpinner"></div>
+        <strong id="joinOverlayTitle">正在加入房间</strong>
+        <span id="joinOverlayText">正在连接服务器并等待房主同步牌局...</span>
+      </div>
     </section>
   </main>
 

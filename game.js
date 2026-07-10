@@ -71,7 +71,11 @@ const el = {
   onlineStatus: document.querySelector("#onlineStatus"),
   joinOverlay: document.querySelector("#joinOverlay"),
   joinOverlayTitle: document.querySelector("#joinOverlayTitle"),
-  joinOverlayText: document.querySelector("#joinOverlayText")
+  joinOverlayText: document.querySelector("#joinOverlayText"),
+  inviteJoinDialog: document.querySelector("#inviteJoinDialog"),
+  inviteRoomLabel: document.querySelector("#inviteRoomLabel"),
+  inviteNameInput: document.querySelector("#inviteNameInput"),
+  inviteJoinBtn: document.querySelector("#inviteJoinBtn")
 };
 
 const online = {
@@ -1862,6 +1866,7 @@ el.hostBtn.addEventListener("click", async () => {
   online.seat = 0;
   online.hasSnapshot = true;
   state.players[0].name = cleanPlayerName(el.nameInput.value, "房主");
+  rememberPlayerName(state.players[0].name);
   online.waitingRoom = true;
   online.pendingRole = "host";
   sendSocket({ type: "create" });
@@ -1869,13 +1874,13 @@ el.hostBtn.addEventListener("click", async () => {
   render();
 });
 
-el.joinBtn.addEventListener("click", async () => {
+async function joinRoomFromInputs(options = {}) {
   if (online.joining) return;
   if (isOnlineRoomMember()) {
     updateOnlineStatus("你已经在房间中，刷新页面后才能加入其他房间");
     return;
   }
-  const roomId = el.roomInput.value.trim().toUpperCase();
+  const roomId = String(options.roomId || el.roomInput.value).trim().toUpperCase();
   if (!roomId) {
     el.onlineStatus.textContent = "请输入房号";
     return;
@@ -1888,10 +1893,13 @@ el.joinBtn.addEventListener("click", async () => {
     return;
   }
   online.isHost = false;
-  const requestedSeat = Number(el.seatSelect.value);
+  const requestedSeat = Number(options.seat || el.seatSelect.value);
   online.seat = requestedSeat;
   online.roomId = roomId;
-  const name = cleanPlayerName(el.nameInput.value, `玩家 ${requestedSeat}`);
+  const name = cleanPlayerName(options.name ?? el.nameInput.value, `玩家 ${requestedSeat}`);
+  el.roomInput.value = roomId;
+  el.nameInput.value = name;
+  rememberPlayerName(name);
   online.waitingRoom = true;
   online.readySeats = {};
   online.hasSnapshot = false;
@@ -1899,10 +1907,15 @@ el.joinBtn.addEventListener("click", async () => {
   sendSocket({ type: "join", roomId, seat: requestedSeat, name });
   updateOnlineStatus("正在加入房间，等待房主同步牌局...");
   setJoining(true, "已发送加入请求", "等待房主同步牌局，请不要重复点击。");
+}
+
+el.joinBtn.addEventListener("click", () => {
+  joinRoomFromInputs();
 });
 
 el.renameBtn.addEventListener("click", () => {
   const name = cleanPlayerName(el.nameInput.value, localSeat() === 0 ? "你" : `玩家 ${localSeat()}`);
+  rememberPlayerName(name);
   if (online.connected && !online.isHost) {
     sendSocket({ type: "action", action: "rename", name });
     return;
@@ -1925,6 +1938,19 @@ el.inviteBtn.addEventListener("click", async () => {
   }
 });
 
+el.inviteJoinBtn?.addEventListener("click", () => {
+  const roomId = el.roomInput.value.trim().toUpperCase();
+  const name = cleanPlayerName(el.inviteNameInput?.value || el.nameInput.value, "玩家");
+  hideInviteJoinDialog();
+  joinRoomFromInputs({ roomId, name });
+});
+
+el.inviteNameInput?.addEventListener("keydown", event => {
+  if (event.key !== "Enter") return;
+  event.preventDefault();
+  el.inviteJoinBtn?.click();
+});
+
 function renameSeat(seat, name) {
   const player = state.players[seat];
   if (!player) return;
@@ -1936,6 +1962,22 @@ function inviteUrl(roomId) {
   const url = new URL(window.location.href);
   url.searchParams.set("room", roomId);
   return url.toString();
+}
+
+function rememberPlayerName(name) {
+  try {
+    localStorage.setItem("jokerPlayerName", name);
+  } catch {
+    // ignore storage failures in private browsing
+  }
+}
+
+function savedPlayerName() {
+  try {
+    return localStorage.getItem("jokerPlayerName") || "";
+  } catch {
+    return "";
+  }
 }
 
 function openSocket() {
@@ -2136,7 +2178,28 @@ function initInviteParams() {
   const room = String(params.get("room") || "").trim().toUpperCase();
   if (!room) return;
   el.roomInput.value = room;
-  el.onlineStatus.textContent = `已识别邀请房号 ${room}，输入昵称后点“加入”。`;
+  const savedName = savedPlayerName();
+  if (savedName && !el.nameInput.value.trim()) el.nameInput.value = savedName;
+  el.onlineStatus.textContent = `已识别邀请房号 ${room}，准备进入房间。`;
+  if (savedName) {
+    joinRoomFromInputs({ roomId: room, name: savedName });
+    return;
+  }
+  showInviteJoinDialog(room);
+}
+
+function showInviteJoinDialog(room) {
+  if (!el.inviteJoinDialog) return;
+  document.body.dataset.inviteJoin = "true";
+  if (el.inviteRoomLabel) el.inviteRoomLabel.textContent = `房号 ${room}`;
+  if (el.inviteNameInput) {
+    el.inviteNameInput.value = el.nameInput.value.trim();
+    setTimeout(() => el.inviteNameInput.focus(), 80);
+  }
+}
+
+function hideInviteJoinDialog() {
+  document.body.dataset.inviteJoin = "false";
 }
 
 startGame({ resetMatch: true });

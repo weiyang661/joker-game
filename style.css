@@ -280,6 +280,52 @@ body[data-joining="true"] .joinOverlay {
   display: flex;
 }
 
+.inviteJoinDialog {
+  position: fixed;
+  inset: 0;
+  z-index: 88;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(8, 19, 19, .58);
+  backdrop-filter: blur(3px);
+}
+
+body[data-invite-join="true"] .inviteJoinDialog {
+  display: flex;
+}
+
+.inviteJoinCard {
+  width: min(380px, calc(100vw - 42px));
+  display: grid;
+  gap: 12px;
+  padding: 24px;
+  border-radius: 12px;
+  background: rgba(14, 35, 35, .95);
+  border: 1px solid rgba(255, 231, 150, .3);
+  box-shadow: 0 24px 70px rgba(0,0,0,.42);
+  text-align: center;
+}
+
+.inviteJoinCard strong {
+  font-size: 24px;
+  color: #fff7d4;
+}
+
+.inviteJoinCard span {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.inviteJoinCard input {
+  width: 100%;
+  border: 1px solid rgba(255,255,255,.18);
+  border-radius: 8px;
+  padding: 11px 12px;
+  background: rgba(255,255,255,.94);
+  color: #202020;
+}
+
 .joinCard {
   width: min(360px, calc(100vw - 42px));
   min-height: 150px;

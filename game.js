@@ -616,6 +616,7 @@ function bombPower(play) {
 
 function playCards(player, cards) {
   if (state.pendingSnowChoice) return { ok: false, reason: "等待胜利阵营选择雪或不雪。" };
+  if (!state.currentPlay) clearCurrentTrickPlays();
   const play = classify(cards);
   const beat = canBeat(play, state.currentPlay);
   if (!beat.ok) return beat;
@@ -709,11 +710,18 @@ function awardTrick() {
   state.trickPoints = 0;
   state.currentPlay = null;
   state.passes = new Set();
+  clearCurrentTrickPlays();
   state.current = nextLeaderAfterTrick(winner);
   state.leader = state.current;
   checkWin();
   render();
   maybeBotTurn();
+}
+
+function clearCurrentTrickPlays() {
+  state.players.forEach(player => {
+    player.lastPlay = null;
+  });
 }
 
 function nextLeaderAfterTrick(winner) {
@@ -1096,9 +1104,6 @@ function renderTableCenter() {
   const current = state.revealPhase || state.gameOver && !state.continuingForNextLead
     ? ""
     : `<div class="centerLine">轮到：<strong>${player?.name || "无"}</strong></div>`;
-  const last = state.currentPlay
-    ? `<div class="tablePlayedName">${state.currentPlay.name}</div>`
-    : `<div class="tablePlayedName">新回合</div>`;
   const settlement = state.roundSettled
     ? `<div class="settlementStrip">${state.lastSettlement.map(item => `<span>${item.name} 总分 ${item.total} 本局 ${formatSigned(item.delta)}</span>`).join("")}</div>`
     : "";
@@ -1111,7 +1116,6 @@ function renderTableCenter() {
     ${current}
     <div class="centerLine">本墩分：<strong>${state.trickPoints}</strong></div>
     <div class="centerLine">牌局中剩余大王：<strong>${remainingBigCount()}</strong> 张</div>
-    ${last}
     ${snowChoice}
     ${settlement}
   `;
@@ -1123,15 +1127,27 @@ function renderTablePlayLayer() {
     el.tablePlayLayer.innerHTML = "";
     return;
   }
-  if (!state.currentPlay) {
-    el.tablePlayLayer.innerHTML = `<div class="tablePlayEmpty">新回合</div>`;
+  const hasPlay = state.players.some(player => player.lastPlay);
+  if (!hasPlay) {
+    el.tablePlayLayer.innerHTML = "";
     return;
   }
-  const playerName = state.players[state.lastPlayer]?.name || "";
-  el.tablePlayLayer.innerHTML = `
-    <div class="tablePlayTitle">${playerName} · ${state.currentPlay.name}</div>
-    <div class="tablePlayCards">${state.currentPlay.cards.map(tableCard).join("")}</div>
-  `;
+  const slots = [
+    ["50%", "76%"],
+    ["25%", "50%"],
+    ["50%", "31%"],
+    ["78%", "50%"],
+    ["68%", "64%"]
+  ];
+  el.tablePlayLayer.innerHTML = state.players.map((player, index) => {
+    const play = player.lastPlay;
+    const content = !play
+      ? ""
+      : play.cards.length
+      ? `<div class="tablePlayTitle">${player.name} · ${play.name}</div><div class="tablePlayCards">${play.cards.map(tableCard).join("")}</div>`
+      : `<div class="tablePlayPass">${player.name} · 过</div>`;
+    return `<div class="tablePlaySlot slot${index}" style="left:${slots[index][0]};top:${slots[index][1]}">${content}</div>`;
+  }).join("");
 }
 
 function remainingBigCount() {

@@ -397,27 +397,36 @@ body[data-menu="hidden"] .topActions button:not(#menuToggleBtn) {
 
 .tablePlayLayer {
   position: absolute;
-  left: 50%;
-  top: 42%;
-  transform: translate(-50%, -50%);
+  inset: 0;
   z-index: 22;
   pointer-events: none;
-  width: min(760px, 68vw);
-  min-height: 124px;
+}
+
+.tablePlaySlot {
+  position: absolute;
+  min-width: 150px;
+  min-height: 96px;
+  transform: translate(-50%, -50%);
   display: grid;
   justify-items: center;
   align-content: center;
+  padding: 4px;
+}
+
+.tablePlaySlot:empty {
+  display: none;
 }
 
 .tablePlayTitle {
   display: inline-block;
-  padding: 5px 12px;
+  padding: 4px 10px;
   border-radius: 999px;
   background: rgba(0,0,0,.48);
   color: #ffe793;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 900;
   text-shadow: 0 2px 4px rgba(0,0,0,.35);
+  white-space: nowrap;
 }
 
 .tablePlayCards {
@@ -426,18 +435,33 @@ body[data-menu="hidden"] .topActions button:not(#menuToggleBtn) {
   align-items: flex-end;
   flex-wrap: wrap;
   gap: 0;
-  margin: 10px auto 0;
-  max-width: min(720px, 76vw);
-  min-height: 86px;
+  margin: 7px auto 0;
+  max-width: min(360px, 30vw);
+  min-height: 70px;
 }
 
-.tablePlayEmpty {
+.tablePlayPass {
   padding: 6px 14px;
   border-radius: 999px;
-  background: rgba(0,0,0,.22);
-  color: rgba(255,255,255,.78);
+  background: rgba(0,0,0,.45);
+  color: #ffe793;
   font-size: 15px;
-  font-weight: 800;
+  font-weight: 900;
+}
+
+.tablePlaySlot .tableCard {
+  width: clamp(38px, 3.4vw, 52px);
+  height: clamp(56px, 5vw, 76px);
+  margin-left: clamp(-11px, -1vw, -6px);
+  padding: 5px 4px;
+}
+
+.tablePlaySlot .tableCard b {
+  font-size: clamp(17px, 1.7vw, 27px);
+}
+
+.tablePlaySlot .tableCard i {
+  font-size: clamp(15px, 1.5vw, 22px);
 }
 
 .phasePill {

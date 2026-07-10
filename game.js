@@ -1256,7 +1256,7 @@ function renderHand() {
     const yaoHint = hasYaoHint(human.hand) && (card.rank === "A" || card.rank === "4") ? " yaoHint" : "";
     const bigState = cardStateClass(card);
     const pointBadge = card.points ? `<div class="pointBadge">分</div>` : "";
-    return `<div class="card${selected}${color}${yaoHint}${bigState}" data-id="${card.id}">
+    return `<div class="card${selected}${color}${yaoHint}${bigState}" data-id="${card.id}" data-suit="${card.suit}">
       <div class="rank">${cardLabel(card)}</div>
       <div class="suit">${card.suit}</div>
       ${pointBadge}

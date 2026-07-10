@@ -770,6 +770,10 @@ function checkWin() {
       endRound(`${teamName(team)}拿满 200 分，大雪获胜。`, team, 4);
       return;
     }
+    if (state.scores[team] >= 180 && hasAnyHeadRunner() && allPointsAwarded()) {
+      endRound(`已有头跑且 200 分已全部分完，${teamName(team)}达到 180 分，直接小雪。`, team, 2);
+      return;
+    }
     if (state.snowChasingTeam && state.snowChasingTeam !== team) continue;
     if (state.scores[team] >= 140) {
       offerSnowChoiceOrEnd(`${teamName(team)}达到 140 分，已满足胜利条件。`, team);
@@ -782,6 +786,14 @@ function checkWin() {
       return;
     }
   }
+}
+
+function hasAnyHeadRunner() {
+  return state.finishedOrder.length > 0;
+}
+
+function allPointsAwarded() {
+  return state.scores.king + state.scores.plain >= 200 && state.trickPoints === 0;
 }
 
 function offerSnowChoiceOrEnd(message, winnerTeam) {

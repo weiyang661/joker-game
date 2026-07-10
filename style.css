@@ -1064,18 +1064,20 @@ body[data-menu="hidden"] .topActions button:not(#menuToggleBtn) {
 }
 
 .handActions {
-  position: fixed;
-  left: 50%;
-  bottom: 218px;
-  z-index: 35;
-  transform: translateX(-50%);
+  position: relative;
+  z-index: 4;
   display: flex;
-  gap: 10px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 7px;
   align-items: center;
+  flex: 0 0 auto;
 }
 
 .handActions button {
-  min-width: 74px;
+  min-width: 68px;
+  min-height: 34px;
+  padding: 6px 10px;
 }
 
 #teammateBtn[hidden] {
@@ -1083,9 +1085,9 @@ body[data-menu="hidden"] .topActions button:not(#menuToggleBtn) {
 }
 
 #playBtn {
-  min-width: 164px;
-  min-height: 58px;
-  font-size: 25px;
+  min-width: 110px;
+  min-height: 38px;
+  font-size: 18px;
   border-radius: 10px;
 }
 
@@ -1384,10 +1386,10 @@ body[data-menu="hidden"] .topActions button:not(#menuToggleBtn) {
     height: 198px;
   }
   .handActions {
-    position: fixed;
-    left: 50%;
-    bottom: 206px;
-    transform: translateX(-50%);
+    position: relative;
+    left: auto;
+    bottom: auto;
+    transform: none;
     justify-content: flex-start;
     flex-wrap: wrap;
   }

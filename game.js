@@ -670,7 +670,6 @@ function finishPlayer(player) {
       return;
     }
     addLog(`${teamName(player.team)}未达到 90 分，头跑不触发胜利，继续游戏。`);
-    return;
   }
   checkWin();
 }
@@ -794,7 +793,8 @@ function offerSnowChoiceOrEnd(message, winnerTeam) {
   if (state.scores[rival] < 25) {
     const deciders = unfinishedTeamPlayers(winnerTeam);
     if (!deciders.length) {
-      endRound(`${message} ${teamName(winnerTeam)}已无人持牌决定雪，按无雪获胜。`, winnerTeam, 1);
+      const multiplier = state.scores[rival] === 0 ? 4 : 2;
+      endRound(`${message} ${teamName(winnerTeam)}已全部出完，对方未免雪，直接${multiplier === 4 ? "大雪" : "小雪"}。`, winnerTeam, multiplier);
       return;
     }
     state.pendingSnowChoice = { winnerTeam, message };

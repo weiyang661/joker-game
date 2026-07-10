@@ -474,6 +474,16 @@ body[data-menu="hidden"] .topActions button:not(#menuToggleBtn) {
   font-size: clamp(15px, 1.5vw, 22px);
 }
 
+.tableCard.brightBig,
+.tinyCard.brightBig {
+  color: #1d54a7;
+}
+
+.tableCard.darkBig,
+.tinyCard.darkBig {
+  color: #24344f;
+}
+
 .phasePill {
   display: inline-block;
   padding: 4px 10px;
@@ -533,13 +543,41 @@ body[data-menu="hidden"] .topActions button:not(#menuToggleBtn) {
   height: clamp(68px, 6.2vw, 94px);
   margin-left: clamp(-12px, -1vw, -7px);
   padding: 6px 5px;
-  border-radius: 7px;
-  border: 1px solid #bbb;
-  background: linear-gradient(#fff, #e7e7e4);
+  border-radius: 8px;
+  border: 1px solid #b5ad9f;
+  background:
+    linear-gradient(145deg, rgba(255,255,255,.96), rgba(255,255,255,0) 38%),
+    radial-gradient(circle at 50% 68%, rgba(255,255,255,.7), transparent 28%),
+    linear-gradient(#fffdf8, #e7e4dc);
   color: #111;
-  box-shadow: 0 8px 14px rgba(0,0,0,.28);
+  box-shadow:
+    inset 0 0 0 2px rgba(255,255,255,.42),
+    inset 0 -10px 18px rgba(0,0,0,.055),
+    0 10px 16px rgba(0,0,0,.30);
   font-family: Georgia, "Times New Roman", serif;
   font-weight: 900;
+}
+
+.tableCard::before {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border-radius: 6px;
+  border: 1px solid rgba(0,0,0,.08);
+  pointer-events: none;
+}
+
+.tableCard::after {
+  content: "";
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  width: 26%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: .08;
+  pointer-events: none;
 }
 
 .tableCard:first-child { margin-left: 0; }
@@ -548,12 +586,16 @@ body[data-menu="hidden"] .topActions button:not(#menuToggleBtn) {
 .tableCard b {
   font-size: clamp(20px, 2.1vw, 34px);
   line-height: .95;
+  text-shadow: 0 1px 0 rgba(255,255,255,.55);
+  z-index: 1;
 }
 .tableCard i {
   align-self: end;
   justify-self: center;
   font-style: normal;
-  font-size: clamp(18px, 1.8vw, 28px);
+  font-size: clamp(20px, 2vw, 32px);
+  line-height: .9;
+  z-index: 1;
 }
 .tableCard em {
   position: absolute;
@@ -562,10 +604,14 @@ body[data-menu="hidden"] .topActions button:not(#menuToggleBtn) {
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background: #e09a2d;
+  background: radial-gradient(circle at 34% 24%, #ffe093, #d58a1f 72%);
   color: white;
+  border: 1px solid rgba(255,255,255,.62);
   font: 900 12px/18px "Microsoft YaHei", sans-serif;
   text-align: center;
+  text-shadow: 0 1px 1px rgba(0,0,0,.36);
+  box-shadow: 0 2px 4px rgba(0,0,0,.28);
+  z-index: 2;
 }
 
 .settlementStrip {
@@ -677,9 +723,12 @@ body[data-menu="hidden"] .topActions button:not(#menuToggleBtn) {
   width: 22px;
   height: 32px;
   margin-left: -5px;
-  border-radius: 4px;
-  border: 1px solid rgba(255,255,255,.5);
-  background: linear-gradient(135deg, #1f4a83, #122b55);
+  border-radius: 5px;
+  border: 1px solid rgba(255,255,255,.58);
+  background:
+    radial-gradient(circle at 28% 24%, rgba(255,255,255,.38), transparent 18%),
+    linear-gradient(135deg, #245d9f, #10264f 62%, #07162f);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.08), 0 3px 5px rgba(0,0,0,.25);
 }
 
 .backCard:first-child, .tinyCard:first-child { margin-left: 0; }
@@ -689,12 +738,14 @@ body[data-menu="hidden"] .topActions button:not(#menuToggleBtn) {
   min-width: 28px;
   width: 28px;
   padding: 5px 2px;
-  background: linear-gradient(#fff, #e8e8e5);
+  background:
+    linear-gradient(145deg, rgba(255,255,255,.95), rgba(255,255,255,0) 42%),
+    linear-gradient(#fffdf7, #e5e3dc);
   color: #111;
-  border-color: #b8b8b8;
+  border-color: #b8b1a5;
   font-size: 12px;
   font-weight: 900;
-  box-shadow: 0 2px 4px rgba(0,0,0,.18);
+  box-shadow: 0 4px 7px rgba(0,0,0,.24);
 }
 
 .tinyCard.red { color: var(--red); }
@@ -706,12 +757,14 @@ body[data-menu="hidden"] .topActions button:not(#menuToggleBtn) {
   width: 12px;
   height: 12px;
   border-radius: 50%;
-  background: #e09a2d;
+  background: radial-gradient(circle at 35% 25%, #ffd979, #d79022 72%);
   color: #fff;
+  border: 1px solid rgba(255,255,255,.55);
   font-style: normal;
   font-size: 9px;
   line-height: 12px;
   text-align: center;
+  box-shadow: 0 1px 2px rgba(0,0,0,.25);
 }
 
 .handPanel {
@@ -787,9 +840,12 @@ body[data-menu="hidden"] .topActions button:not(#menuToggleBtn) {
   flex: 0 0 clamp(48px, 4.6vw, 78px);
   height: clamp(90px, 9.3vw, 132px);
   margin-left: clamp(-18px, -1.25vw, -10px);
-  border-radius: 7px;
-  border: 1px solid #b6b6b3;
-  background: linear-gradient(#fff, #e9e9e6);
+  border-radius: 9px;
+  border: 1px solid #b5ad9f;
+  background:
+    linear-gradient(145deg, rgba(255,255,255,.98), rgba(255,255,255,0) 36%),
+    radial-gradient(circle at 50% 68%, rgba(255,255,255,.78), transparent 28%),
+    linear-gradient(#fffdf8, #ebe8df);
   color: #111;
   display: grid;
   grid-template-rows: auto 1fr;
@@ -798,63 +854,115 @@ body[data-menu="hidden"] .topActions button:not(#menuToggleBtn) {
   gap: 2px;
   padding: 7px 6px;
   cursor: pointer;
-  box-shadow: 0 3px 7px rgba(0,0,0,.3);
+  box-shadow:
+    inset 0 0 0 2px rgba(255,255,255,.45),
+    inset 0 -12px 22px rgba(0,0,0,.06),
+    0 8px 14px rgba(0,0,0,.32);
   user-select: none;
-  transition: transform .12s ease, box-shadow .12s ease;
+  transition: transform .12s ease, box-shadow .12s ease, filter .12s ease;
+}
+
+.card::before {
+  content: "";
+  position: absolute;
+  inset: 5px;
+  border-radius: 6px;
+  border: 1px solid rgba(0,0,0,.08);
+  pointer-events: none;
+}
+
+.card::after {
+  content: "";
+  position: absolute;
+  right: 7px;
+  bottom: 7px;
+  width: 28%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: .08;
+  pointer-events: none;
 }
 
 .card:first-child { margin-left: 0; }
 
 .card.selected {
-  transform: translateY(-20px);
-  border-color: var(--gold);
-  box-shadow: 0 12px 18px rgba(0,0,0,.34);
+  transform: translateY(-22px);
+  border-color: #f3c767;
+  filter: saturate(1.05);
+  box-shadow:
+    inset 0 0 0 2px rgba(255,255,255,.55),
+    0 0 0 3px rgba(224,163,56,.35),
+    0 16px 22px rgba(0,0,0,.38);
 }
 
 .card.yaoHint {
   border-color: var(--gold);
-  background: linear-gradient(#fff8dc, #eee2b7);
+  background:
+    linear-gradient(145deg, rgba(255,255,255,.96), rgba(255,255,255,0) 36%),
+    linear-gradient(#fff8dc, #eadfae);
 }
 
 .card.brightBig, .tinyCard.brightBig {
   border-color: #c89128;
-  background: linear-gradient(#fff5c8, #f1d27a);
+  background:
+    radial-gradient(circle at 24% 18%, rgba(255,255,255,.95), transparent 20%),
+    linear-gradient(145deg, #fff6c9, #eec257 76%);
+  box-shadow:
+    inset 0 0 0 2px rgba(255,255,255,.48),
+    0 0 0 2px rgba(224,163,56,.28),
+    0 10px 16px rgba(0,0,0,.32);
 }
 
 .card.darkBig, .tinyCard.darkBig {
   border-color: #4a5970;
-  background: linear-gradient(#f4f6f8, #d9dee7);
+  background:
+    radial-gradient(circle at 24% 18%, rgba(255,255,255,.9), transparent 20%),
+    linear-gradient(145deg, #f6f8fb, #d4dbe7 76%);
+  box-shadow:
+    inset 0 0 0 2px rgba(255,255,255,.42),
+    0 0 0 2px rgba(74,89,112,.16),
+    0 10px 16px rgba(0,0,0,.30);
 }
 
 .card .rank {
-  font-size: clamp(24px, 3vw, 46px);
+  font-size: clamp(24px, 3vw, 45px);
   line-height: .95;
   font-family: Georgia, "Times New Roman", serif;
   font-weight: 900;
+  letter-spacing: 0;
+  text-shadow: 0 1px 0 rgba(255,255,255,.55);
+  z-index: 1;
 }
 
 .card .suit {
   align-self: end;
   justify-self: center;
-  font-size: clamp(20px, 2.6vw, 40px);
+  font-size: clamp(24px, 3vw, 46px);
   color: currentColor;
-  opacity: .98;
+  opacity: .96;
+  line-height: .9;
+  filter: drop-shadow(0 1px 0 rgba(255,255,255,.45));
+  z-index: 1;
 }
 
 .pointBadge {
   position: absolute;
-  right: 8px;
-  bottom: 25px;
+  right: 7px;
+  bottom: 27px;
   width: clamp(18px, 1.6vw, 24px);
   height: clamp(18px, 1.6vw, 24px);
   border-radius: 50%;
-  background: #e09a2d;
+  background: radial-gradient(circle at 34% 24%, #ffe093, #d58a1f 72%);
   color: white;
+  border: 1px solid rgba(255,255,255,.62);
   font-size: clamp(11px, 1vw, 14px);
   line-height: clamp(18px, 1.6vw, 24px);
   text-align: center;
   font-weight: 900;
   font-family: "Microsoft YaHei", sans-serif;
+  text-shadow: 0 1px 1px rgba(0,0,0,.36);
+  box-shadow: 0 2px 4px rgba(0,0,0,.28);
 }
 
 .card.red { color: var(--red); }

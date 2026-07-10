@@ -17,12 +17,18 @@
 
 * { box-sizing: border-box; }
 
-html, body { min-height: 100%; }
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
 
 body {
   margin: 0;
-  min-height: 100vh;
-  overflow-x: hidden;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
   color: var(--ink);
   font-family: "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
   background:
@@ -72,12 +78,14 @@ button.primary, #playBtn {
 
 .app {
   width: min(1920px, 100%);
-  min-height: 100vh;
+  height: 100vh;
+  min-height: 0;
   margin: 0 auto;
-  padding: 10px clamp(10px, 2vw, 28px) 14px;
+  padding: 4px clamp(8px, 1.4vw, 22px) 0;
   display: grid;
-  grid-template-rows: auto minmax(520px, 1fr) auto;
-  gap: 8px;
+  grid-template-rows: minmax(0, 1fr);
+  gap: 0;
+  overflow: hidden;
 }
 
 h1, h2, p { margin: 0; }
@@ -112,8 +120,10 @@ p { color: var(--muted); font-size: 12px; margin-top: 3px; }
 
 .layout {
   position: relative;
-  min-height: min(72vh, 720px);
+  height: 100vh;
+  min-height: 0;
   display: block;
+  overflow: hidden;
 }
 
 .panel, .handPanel {
@@ -337,9 +347,9 @@ body[data-menu="hidden"] .topActions button:not(#menuToggleBtn) {
 
 .tableWrap {
   position: relative;
-  min-height: min(72vh, 720px);
-  height: min(72vh, 720px);
-  margin: 48px auto 0;
+  min-height: 0;
+  height: calc(100vh - 270px);
+  margin: 70px auto 0;
   border-radius: 30px;
   background:
     radial-gradient(ellipse at 50% 40%, rgba(255,255,255,.15), transparent 35%),
@@ -376,7 +386,7 @@ body[data-menu="hidden"] .topActions button:not(#menuToggleBtn) {
 .table {
   position: relative;
   height: 100%;
-  min-height: min(72vh, 720px);
+  min-height: 0;
 }
 
 .tableCenter {
@@ -710,7 +720,8 @@ body[data-menu="hidden"] .topActions button:not(#menuToggleBtn) {
   right: clamp(14px, 2.5vw, 46px);
   bottom: 14px;
   z-index: 28;
-  min-height: 164px;
+  height: 178px;
+  min-height: 0;
   padding: 10px 14px 12px;
   background: linear-gradient(180deg, rgba(8,52,57,.78), rgba(7,32,42,.9));
 }
@@ -762,7 +773,8 @@ body[data-menu="hidden"] .topActions button:not(#menuToggleBtn) {
   overflow-x: auto;
   overflow-y: visible;
   padding: 16px 18px 10px;
-  min-height: 118px;
+  height: 126px;
+  min-height: 0;
   scrollbar-width: thin;
 }
 
@@ -866,11 +878,11 @@ body[data-menu="hidden"] .topActions button:not(#menuToggleBtn) {
 }
 
 @media (max-width: 1100px) {
-  body { overflow-x: hidden; }
+  body { overflow: hidden; }
   .app {
     min-width: 0;
     padding: 8px;
-    grid-template-rows: auto minmax(500px, 1fr) auto;
+    grid-template-rows: minmax(0, 1fr);
   }
   .topbar {
     position: fixed;
@@ -895,11 +907,11 @@ body[data-menu="hidden"] .topActions button:not(#menuToggleBtn) {
     width: 300px;
   }
   .tableWrap {
-    margin-top: 48px;
-    min-height: 500px;
-    height: 58vh;
+    margin-top: 60px;
+    min-height: 0;
+    height: calc(100vh - 262px);
   }
-  .table { min-height: 500px; }
+  .table { min-height: 0; }
   .seat {
     width: 130px;
     transform: translate(-50%, -50%) scale(.78);
@@ -916,15 +928,18 @@ body[data-menu="hidden"] .topActions button:not(#menuToggleBtn) {
     height: 62px;
   }
   .handPanel {
-    position: relative;
-    left: auto;
-    right: auto;
-    bottom: auto;
-    margin-top: 8px;
+    position: fixed;
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    margin-top: 0;
+    height: 170px;
   }
   .handActions {
-    position: static;
-    transform: none;
+    position: fixed;
+    left: 50%;
+    bottom: 190px;
+    transform: translateX(-50%);
     justify-content: flex-start;
     flex-wrap: wrap;
   }

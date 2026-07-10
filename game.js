@@ -154,6 +154,10 @@ function localPlayer() {
   return state.players[localSeat()] || state.players[0];
 }
 
+function relativeSeatIndex(seat) {
+  return (Number(seat) - localSeat() + 5) % 5;
+}
+
 function isHostRuntime() {
   return !online.connected || online.isHost;
 }
@@ -1133,20 +1137,21 @@ function renderTablePlayLayer() {
     return;
   }
   const slots = [
-    ["50%", "76%"],
-    ["25%", "50%"],
-    ["50%", "31%"],
-    ["78%", "50%"],
-    ["68%", "64%"]
+    ["50%", "66%"],
+    ["24%", "51%"],
+    ["50%", "34%"],
+    ["76%", "51%"],
+    ["68%", "63%"]
   ];
   el.tablePlayLayer.innerHTML = state.players.map((player, index) => {
+    const slotIndex = relativeSeatIndex(index);
     const play = player.lastPlay;
     const content = !play
       ? ""
       : play.cards.length
       ? `<div class="tablePlayTitle">${player.name} · ${play.name}</div><div class="tablePlayCards">${play.cards.map(tableCard).join("")}</div>`
       : `<div class="tablePlayPass">${player.name} · 过</div>`;
-    return `<div class="tablePlaySlot slot${index}" style="left:${slots[index][0]};top:${slots[index][1]}">${content}</div>`;
+    return `<div class="tablePlaySlot slot${slotIndex}" style="left:${slots[slotIndex][0]};top:${slots[slotIndex][1]}">${content}</div>`;
   }).join("");
 }
 
@@ -1165,13 +1170,14 @@ function revealedBigStatus(player) {
 
 function renderTable() {
   const positions = [
-    ["18%", "78%"],
-    ["8%", "50%"],
-    ["50%", "13%"],
-    ["92%", "50%"],
-    ["82%", "78%"]
+    ["50%", "78%"],
+    ["14%", "55%"],
+    ["50%", "15%"],
+    ["86%", "55%"],
+    ["76%", "78%"]
   ];
   const seats = state.players.map((player, index) => {
+    const seatIndex = relativeSeatIndex(index);
     const isTurn = index === state.current && (!state.gameOver || state.continuingForNextLead);
     const team = online.connected && online.waitingRoom
       ? (player.human ? (online.readySeats[index] ? "已准备" : "未准备") : "人机候补")
@@ -1184,7 +1190,7 @@ function renderTable() {
     const matchLine = player.roundDelta
       ? `总分 ${player.matchScore || 0} · 本局 ${formatSigned(player.roundDelta)}`
       : `总分 ${player.matchScore || 0}`;
-    return `<article class="seat seat${index}" style="left:${positions[index][0]};top:${positions[index][1]}">
+    return `<article class="seat seat${seatIndex}" style="left:${positions[seatIndex][0]};top:${positions[seatIndex][1]}">
       <div class="scoreTag">${player.score} 分 · ${matchLine}</div>
       <div class="name">${isTurn ? "▶" : ""}${player.name}<span class="badge">${player.hand.length} 张</span></div>
       <div class="meta">${team}${player.finished ? " · 已出完" : ""}</div>

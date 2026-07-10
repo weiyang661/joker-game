@@ -1054,6 +1054,14 @@ function jokerFaceHtml(card) {
   </div>`;
 }
 
+function jokerTableFaceHtml(card) {
+  const title = card.joker === "small" ? "小王" : cardLabel(card);
+  return `<div class="jokerTableFace">
+    <span>JOKER</span>
+    <strong>${title}</strong>
+  </div>`;
+}
+
 function addLog(text) {
   state.log.unshift(text);
   state.log = state.log.slice(0, 80);
@@ -1330,14 +1338,28 @@ function teammateHandsHtml(human) {
 function renderSelection() {
   if (online.connected && online.waitingRoom) {
     el.selectionInfo.textContent = "房间准备中，开始本局后才会发牌。";
+    el.playBtn.textContent = "出牌";
+    el.passBtn.textContent = "过";
+    el.clearBtn.textContent = "取消选择";
     el.playBtn.disabled = true;
     el.passBtn.disabled = true;
     el.clearBtn.disabled = true;
+    el.clearBtn.hidden = false;
     el.teammateBtn.disabled = true;
     el.teammateBtn.hidden = true;
     return;
   }
   const human = localPlayer();
+  const actionMode = currentActionMode();
+  renderActionButtons(actionMode);
+  if (actionMode.type === "reveal") {
+    el.selectionInfo.textContent = actionMode.count >= 2 ? "请选择亮王数量。" : "请选择亮或不亮大王。";
+    return;
+  }
+  if (actionMode.type === "snow") {
+    el.selectionInfo.textContent = "请选择雪或不雪。";
+    return;
+  }
   const canSeeTeammates = canViewTeammateHands();
   el.teammateBtn.hidden = !human.finished;
   el.teammateBtn.disabled = human.finished && !canSeeTeammates;
@@ -1363,6 +1385,53 @@ function renderSelection() {
   el.playBtn.disabled = !humanTurn || !beat.ok || !cards.length;
   el.passBtn.disabled = !humanTurn || !state.currentPlay;
   el.clearBtn.disabled = false;
+}
+
+function undecidedLocalBigs() {
+  const human = localPlayer();
+  return human.hand.filter(card => card.joker === "big" && !state.bigRevealDecisions.has(card.id));
+}
+
+function currentActionMode() {
+  const human = localPlayer();
+  if (state.revealPhase && !online.waitingRoom) {
+    const undecided = undecidedLocalBigs();
+    if (undecided.length) return { type: "reveal", count: undecided.length };
+  }
+  if (state.pendingSnowChoice && human.team === state.pendingSnowChoice.winnerTeam && !human.finished) {
+    return { type: "snow" };
+  }
+  return { type: "play" };
+}
+
+function renderActionButtons(mode) {
+  el.playBtn.classList.toggle("primary", mode.type !== "snow");
+  if (mode.type === "reveal") {
+    el.playBtn.textContent = mode.count >= 2 ? "亮一张" : "亮";
+    el.passBtn.textContent = mode.count >= 2 ? "都不亮" : "不亮";
+    el.clearBtn.textContent = "亮两张";
+    el.playBtn.disabled = false;
+    el.passBtn.disabled = false;
+    el.clearBtn.disabled = mode.count < 2;
+    el.clearBtn.hidden = mode.count < 2;
+    el.teammateBtn.hidden = true;
+    return;
+  }
+  if (mode.type === "snow") {
+    el.playBtn.textContent = "雪";
+    el.passBtn.textContent = "不雪";
+    el.clearBtn.textContent = "取消选择";
+    el.playBtn.disabled = false;
+    el.passBtn.disabled = false;
+    el.clearBtn.disabled = true;
+    el.clearBtn.hidden = true;
+    el.teammateBtn.hidden = true;
+    return;
+  }
+  el.playBtn.textContent = "出牌";
+  el.passBtn.textContent = "过";
+  el.clearBtn.textContent = "取消选择";
+  el.clearBtn.hidden = false;
 }
 
 function playStrengthText(play) {
@@ -1436,14 +1505,7 @@ function renderRevealBox() {
   if (state.pendingSnowChoice) {
     const pending = state.pendingSnowChoice;
     if (human.team === pending.winnerTeam && !human.finished) {
-      el.revealBox.innerHTML = `<p>${teamName(pending.winnerTeam)}已满足胜利条件，对方未免雪。</p>
-        <div class="revealChoice">
-          <button class="snowChoiceBtn" data-choice="snow">雪</button>
-          <button class="snowChoiceBtn" data-choice="noSnow">不雪</button>
-        </div>`;
-      el.revealBox.querySelectorAll(".snowChoiceBtn").forEach(button => {
-        button.addEventListener("click", () => handleSnowChoice(button.dataset.choice));
-      });
+      el.revealBox.innerHTML = `${teamName(pending.winnerTeam)}已满足胜利条件，对方未免雪。请在手牌栏选择雪或不雪。`;
       return;
     }
     el.revealBox.innerHTML = `等待${teamName(pending.winnerTeam)}未出完玩家选择雪或不雪。`;
@@ -1473,27 +1535,10 @@ function renderRevealBox() {
     return;
   }
   if (undecided.length >= 2) {
-    el.revealBox.innerHTML = `<p>你持有两张大王，请选择开局亮王数量。</p>
-      <div class="revealChoice revealChoiceThree">
-        <span>两张大王</span>
-        <button class="revealCountBtn" data-count="0">都不亮</button>
-        <button class="revealCountBtn" data-count="1">亮一张</button>
-        <button class="revealCountBtn" data-count="2">亮两张</button>
-      </div>`;
-    el.revealBox.querySelectorAll(".revealCountBtn").forEach(button => {
-      button.addEventListener("click", () => handleRevealChoice(Number(button.dataset.count)));
-    });
+    el.revealBox.innerHTML = "你持有两张大王，请在手牌栏选择都不亮、亮一张或亮两张。";
     return;
   }
-  el.revealBox.innerHTML = `<p>你持有一张大王，请在开局前选择亮出或不亮。</p>
-    <div class="revealChoice">
-      <span>${cardLabel(undecided[0])}</span>
-      <button class="revealCountBtn" data-count="1">亮</button>
-      <button class="revealCountBtn" data-count="0">不亮</button>
-    </div>`;
-  el.revealBox.querySelectorAll(".revealCountBtn").forEach(button => {
-    button.addEventListener("click", () => handleRevealChoice(Number(button.dataset.count)));
-  });
+  el.revealBox.innerHTML = `你持有一张大王，请在手牌栏选择亮或不亮。`;
 }
 
 function handleRevealChoice(count) {
@@ -1531,7 +1576,7 @@ function tableCard(card) {
   const jokerKind = jokerKindClass(card);
   const pointBadge = card.points ? `<em>分</em>` : "";
   if (card.joker) {
-    return `<span class="tableCard${color}${cardStateClass(card)}${jokerKind}">${jokerFaceHtml(card)}</span>`;
+    return `<span class="tableCard${color}${cardStateClass(card)}${jokerKind}">${jokerTableFaceHtml(card)}</span>`;
   }
   return `<span class="tableCard${color}${cardStateClass(card)}">
     <span class="tableCorner tableCornerTop"><b>${cardLabel(card)}</b><i>${card.suit}</i></span>
@@ -1546,6 +1591,15 @@ function selectedCards() {
 }
 
 el.playBtn.addEventListener("click", () => {
+  const mode = currentActionMode();
+  if (mode.type === "reveal") {
+    handleRevealChoice(mode.count >= 2 ? 1 : 1);
+    return;
+  }
+  if (mode.type === "snow") {
+    handleSnowChoice("snow");
+    return;
+  }
   if (localPlayer().finished) return;
   if (online.connected && !online.isHost) {
     sendSocket({ type: "action", action: "play", cardIds: selectedCards().map(card => card.id) });
@@ -1560,6 +1614,15 @@ el.playBtn.addEventListener("click", () => {
 });
 
 el.passBtn.addEventListener("click", () => {
+  const mode = currentActionMode();
+  if (mode.type === "reveal") {
+    handleRevealChoice(0);
+    return;
+  }
+  if (mode.type === "snow") {
+    handleSnowChoice("noSnow");
+    return;
+  }
   if (localPlayer().finished) return;
   if (online.connected && !online.isHost) {
     sendSocket({ type: "action", action: "pass" });
@@ -1573,6 +1636,11 @@ el.passBtn.addEventListener("click", () => {
 });
 
 el.clearBtn.addEventListener("click", () => {
+  const mode = currentActionMode();
+  if (mode.type === "reveal" && mode.count >= 2) {
+    handleRevealChoice(2);
+    return;
+  }
   state.selected.clear();
   renderHand();
 });

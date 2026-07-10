@@ -716,6 +716,41 @@ body[data-menu="hidden"] .topActions button:not(#menuToggleBtn) {
   background: #f2f2f2;
 }
 
+.jokerTableFace {
+  position: absolute;
+  inset: 7px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 4px;
+  border-radius: 6px;
+  background:
+    radial-gradient(circle at 50% 42%, rgba(255,255,255,.78), transparent 28%),
+    linear-gradient(#fbfbff, #e8e9f2);
+  border: 1px solid rgba(38,44,70,.12);
+}
+
+.jokerTableFace span {
+  font-family: "Arial Narrow", Arial, sans-serif;
+  font-size: clamp(9px, .95vw, 15px);
+  letter-spacing: .08em;
+  font-weight: 900;
+}
+
+.jokerTableFace strong {
+  font-size: clamp(15px, 1.55vw, 25px);
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.tableCard.bigJoker .jokerTableFace strong {
+  color: #c93637;
+}
+
+.tableCard.smallJoker .jokerTableFace {
+  filter: grayscale(1);
+}
+
 .phasePill {
   display: inline-block;
   padding: 4px 10px;
@@ -825,6 +860,9 @@ body[data-menu="hidden"] .topActions button:not(#menuToggleBtn) {
   font-family: Georgia, "Times New Roman", serif;
   font-weight: 900;
   line-height: .86;
+  padding: 1px 2px;
+  border-radius: 4px;
+  background: rgba(251,251,255,.82);
 }
 
 .tableCorner b {
@@ -842,8 +880,10 @@ body[data-menu="hidden"] .topActions button:not(#menuToggleBtn) {
 }
 
 .tableSuit {
-  align-self: center;
-  justify-self: center;
+  position: absolute;
+  left: 50%;
+  top: 55%;
+  transform: translate(-50%, -50%);
   font-style: normal;
   font-size: clamp(22px, 2.25vw, 36px);
   line-height: .9;
@@ -1188,6 +1228,9 @@ body[data-menu="hidden"] .topActions button:not(#menuToggleBtn) {
   line-height: .82;
   letter-spacing: 0;
   z-index: 2;
+  padding: 2px 3px;
+  border-radius: 5px;
+  background: rgba(251,251,255,.82);
 }
 
 .cardCorner span {
@@ -1200,13 +1243,15 @@ body[data-menu="hidden"] .topActions button:not(#menuToggleBtn) {
 }
 
 .cardCornerTop {
-  left: 9px;
-  top: 9px;
+  left: 8px;
+  top: 8px;
 }
 
 .card .suit {
-  align-self: center;
-  justify-self: center;
+  position: absolute;
+  left: 50%;
+  top: 55%;
+  transform: translate(-50%, -50%);
   font-size: clamp(34px, 3.8vw, 60px);
   color: currentColor;
   opacity: .92;

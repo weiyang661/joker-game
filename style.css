@@ -1688,58 +1688,62 @@ body[data-miniapp="true"] .tableCenter .centerLine {
 }
 
 body[data-miniapp="true"] .seat {
-  width: 126px;
-  min-height: 88px;
-  transform: translate(-50%, -50%) scale(.74);
+  width: 108px;
+  min-height: 78px;
+  transform: translate(-50%, -50%) scale(.70);
 }
 
 body[data-miniapp="true"] .seat::before {
-  width: 48px;
-  height: 48px;
+  width: 50px;
+  height: 50px;
+  margin-bottom: 3px;
 }
 
 body[data-miniapp="true"] .seat0 {
   left: 50% !important;
-  top: 72% !important;
+  top: 83% !important;
 }
 
 body[data-miniapp="true"] .seat1 {
-  left: 18% !important;
-  top: 67% !important;
+  left: 10% !important;
+  top: 61% !important;
 }
 
 body[data-miniapp="true"] .seat2 {
-  left: 18% !important;
-  top: 31% !important;
+  left: 10% !important;
+  top: 28% !important;
 }
 
 body[data-miniapp="true"] .seat3 {
-  left: 82% !important;
-  top: 31% !important;
+  left: 90% !important;
+  top: 28% !important;
 }
 
 body[data-miniapp="true"] .seat4 {
-  left: 82% !important;
-  top: 67% !important;
+  left: 90% !important;
+  top: 61% !important;
 }
 
 body[data-miniapp="true"] .scoreTag {
-  font-size: 13px;
-  padding: 2px 7px;
+  font-size: 12px;
+  padding: 2px 6px;
+  margin-bottom: 3px;
 }
 
 body[data-miniapp="true"] .seat .name {
-  max-width: 118px;
-  font-size: 14px;
-  padding: 3px 7px;
+  max-width: 104px;
+  font-size: 13px;
+  padding: 2px 6px;
 }
 
 body[data-miniapp="true"] .seat .meta {
-  font-size: 11px;
+  margin-top: 3px;
+  font-size: 10px;
 }
 
 body[data-miniapp="true"] .miniCards {
-  transform: scale(.78);
+  margin-top: 4px;
+  transform: scale(.70);
   transform-origin: top center;
 }
 
@@ -1751,27 +1755,27 @@ body[data-miniapp="true"] .tablePlaySlot {
 
 body[data-miniapp="true"] .slot0 {
   left: 50% !important;
-  top: 64% !important;
+  top: 60% !important;
 }
 
 body[data-miniapp="true"] .slot1 {
-  left: 34% !important;
-  top: 62% !important;
+  left: 36% !important;
+  top: 58% !important;
 }
 
 body[data-miniapp="true"] .slot2 {
-  left: 34% !important;
-  top: 35% !important;
+  left: 36% !important;
+  top: 36% !important;
 }
 
 body[data-miniapp="true"] .slot3 {
-  left: 66% !important;
-  top: 35% !important;
+  left: 64% !important;
+  top: 36% !important;
 }
 
 body[data-miniapp="true"] .slot4 {
-  left: 66% !important;
-  top: 62% !important;
+  left: 64% !important;
+  top: 58% !important;
 }
 
 body[data-miniapp="true"] .tablePlayCards {

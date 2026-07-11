@@ -1705,12 +1705,12 @@ body[data-miniapp="true"] .seat0 {
 
 body[data-miniapp="true"] .seat1 {
   left: 18% !important;
-  top: 31% !important;
+  top: 67% !important;
 }
 
 body[data-miniapp="true"] .seat2 {
   left: 18% !important;
-  top: 67% !important;
+  top: 31% !important;
 }
 
 body[data-miniapp="true"] .seat3 {
@@ -1756,12 +1756,12 @@ body[data-miniapp="true"] .slot0 {
 
 body[data-miniapp="true"] .slot1 {
   left: 34% !important;
-  top: 35% !important;
+  top: 62% !important;
 }
 
 body[data-miniapp="true"] .slot2 {
   left: 34% !important;
-  top: 62% !important;
+  top: 35% !important;
 }
 
 body[data-miniapp="true"] .slot3 {

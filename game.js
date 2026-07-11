@@ -1247,6 +1247,20 @@ function renderTableCenter() {
   const snowChoice = state.pendingSnowChoice
     ? `<div class="centerLine"><strong>${teamName(state.pendingSnowChoice.winnerTeam)}</strong> 未出完玩家可选择雪或不雪</div>`
     : "";
+  if (isMiniProgramView) {
+    const turnText = state.revealPhase || state.gameOver && !state.continuingForNextLead
+      ? ""
+      : `轮到：${player?.name || "无"}`;
+    const snowText = state.pendingSnowChoice ? `${teamName(state.pendingSnowChoice.winnerTeam)}选择雪局` : "";
+    el.tableCenter.innerHTML = `
+      <div class="phasePill">${phase}</div>
+      <div class="centerNotice">${state.tableNotice || "牌局进行中"}</div>
+      <div class="centerLine">${snowText || turnText}</div>
+      <div class="centerLine">本墩 ${state.trickPoints} 分 · 大王 ${remainingBigCount()} 张</div>
+      ${settlement}
+    `;
+    return;
+  }
   el.tableCenter.innerHTML = `
     <div class="phasePill">${phase}</div>
     <div class="centerNotice">${state.tableNotice || "牌局进行中"}</div>

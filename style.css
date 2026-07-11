@@ -1639,21 +1639,52 @@ body[data-miniapp="true"] .tableWrap::after {
 
 body[data-miniapp="true"] .tableCenter {
   left: 50%;
-  top: 52%;
-  width: 46%;
-  min-height: 76px;
-  padding: 7px 10px;
-  background: rgba(0, 0, 0, .12);
+  top: 15%;
+  width: 58%;
+  min-height: 0;
+  transform: translate(-50%, -50%);
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgba(4, 29, 28, .62);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .18);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+  overflow: hidden;
 }
 
 body[data-miniapp="true"] .phasePill {
-  font-size: clamp(20px, 4.5vh, 34px);
+  flex: 0 0 auto;
+  font-size: clamp(12px, 2.8vh, 17px);
+  padding: 2px 8px;
 }
 
 body[data-miniapp="true"] .tableCenter p,
 body[data-miniapp="true"] .tableCenter .centerSub,
 body[data-miniapp="true"] .tableCenter .centerTiny {
-  font-size: clamp(11px, 2.5vh, 17px);
+  font-size: clamp(10px, 2.2vh, 13px);
+}
+
+body[data-miniapp="true"] .tableCenter .centerNotice,
+body[data-miniapp="true"] .tableCenter .centerLine {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: clamp(10px, 2.25vh, 14px);
+  line-height: 1.1;
+}
+
+body[data-miniapp="true"] .tableCenter .centerNotice {
+  flex: 1 1 auto;
+  font-weight: 900;
+}
+
+body[data-miniapp="true"] .tableCenter .centerLine {
+  flex: 0 1 auto;
+  color: rgba(248, 241, 223, .86);
 }
 
 body[data-miniapp="true"] .seat {

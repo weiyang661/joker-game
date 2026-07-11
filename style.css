@@ -1554,3 +1554,298 @@ body[data-invite-join="true"] .inviteJoinDialog {
     flex-direction: column;
   }
 }
+
+body[data-miniapp="true"] {
+  overflow: hidden;
+}
+
+body[data-miniapp="true"] .app {
+  width: 100vw;
+  height: 100vh;
+  height: 100svh;
+  padding: 0 10px;
+}
+
+body[data-miniapp="true"] .topbar {
+  left: 12px;
+  top: 10px;
+  width: 140px;
+  max-width: 140px;
+}
+
+body[data-miniapp="true"] .topActions {
+  grid-template-columns: 1fr;
+}
+
+body[data-miniapp="true"] .topActions button:not(#menuToggleBtn) {
+  display: none;
+}
+
+body[data-miniapp="true"] #menuToggleBtn {
+  min-height: 34px;
+  padding: 6px 10px;
+  font-size: 16px;
+  border-radius: 8px;
+}
+
+body[data-miniapp="true"] .scoreboard {
+  width: 330px;
+  max-width: 42vw;
+  max-height: calc(100vh - 24px);
+  left: var(--menu-left, 14px);
+  top: var(--menu-top, 12px);
+  padding: 8px;
+  gap: 6px;
+  grid-template-columns: 1fr;
+}
+
+body[data-miniapp="true"] .scoreRows {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+body[data-miniapp="true"] .onlineBox,
+body[data-miniapp="true"] .roundLogBox {
+  max-height: 32vh;
+  overflow: hidden;
+}
+
+body[data-miniapp="true"] .tableWrap {
+  position: fixed;
+  left: 10px;
+  right: 10px;
+  top: 46px;
+  bottom: 118px;
+  height: auto;
+  min-height: 0;
+  margin: 0;
+  border-width: 11px;
+  border-radius: 22px;
+}
+
+body[data-miniapp="true"] .tableWrap::before {
+  inset: 16px;
+  border-radius: 18px;
+}
+
+body[data-miniapp="true"] .tableWrap::after {
+  left: 15%;
+  top: 52%;
+  font-size: clamp(28px, 6vh, 48px);
+}
+
+body[data-miniapp="true"] .tableCenter {
+  left: 50%;
+  top: 52%;
+  width: 46%;
+  min-height: 76px;
+  padding: 7px 10px;
+  background: rgba(0, 0, 0, .12);
+}
+
+body[data-miniapp="true"] .phasePill {
+  font-size: clamp(20px, 4.5vh, 34px);
+}
+
+body[data-miniapp="true"] .tableCenter p,
+body[data-miniapp="true"] .tableCenter .centerSub,
+body[data-miniapp="true"] .tableCenter .centerTiny {
+  font-size: clamp(11px, 2.5vh, 17px);
+}
+
+body[data-miniapp="true"] .seat {
+  width: 126px;
+  min-height: 88px;
+  transform: translate(-50%, -50%) scale(.74);
+}
+
+body[data-miniapp="true"] .seat::before {
+  width: 48px;
+  height: 48px;
+}
+
+body[data-miniapp="true"] .seat0 {
+  left: 50% !important;
+  top: 72% !important;
+}
+
+body[data-miniapp="true"] .seat1 {
+  left: 18% !important;
+  top: 31% !important;
+}
+
+body[data-miniapp="true"] .seat2 {
+  left: 18% !important;
+  top: 67% !important;
+}
+
+body[data-miniapp="true"] .seat3 {
+  left: 82% !important;
+  top: 31% !important;
+}
+
+body[data-miniapp="true"] .seat4 {
+  left: 82% !important;
+  top: 67% !important;
+}
+
+body[data-miniapp="true"] .scoreTag {
+  font-size: 13px;
+  padding: 2px 7px;
+}
+
+body[data-miniapp="true"] .seat .name {
+  max-width: 118px;
+  font-size: 14px;
+  padding: 3px 7px;
+}
+
+body[data-miniapp="true"] .seat .meta {
+  font-size: 11px;
+}
+
+body[data-miniapp="true"] .miniCards {
+  transform: scale(.78);
+  transform-origin: top center;
+}
+
+body[data-miniapp="true"] .tablePlaySlot {
+  min-width: 112px;
+  min-height: 62px;
+  transform: translate(-50%, -50%) scale(.78);
+}
+
+body[data-miniapp="true"] .slot0 {
+  left: 50% !important;
+  top: 64% !important;
+}
+
+body[data-miniapp="true"] .slot1 {
+  left: 34% !important;
+  top: 35% !important;
+}
+
+body[data-miniapp="true"] .slot2 {
+  left: 34% !important;
+  top: 62% !important;
+}
+
+body[data-miniapp="true"] .slot3 {
+  left: 66% !important;
+  top: 35% !important;
+}
+
+body[data-miniapp="true"] .slot4 {
+  left: 66% !important;
+  top: 62% !important;
+}
+
+body[data-miniapp="true"] .tablePlayCards {
+  max-width: 220px;
+  min-height: 52px;
+}
+
+body[data-miniapp="true"] .tablePlaySlot .tableCard {
+  width: 38px;
+  height: 56px;
+  margin-left: -8px;
+}
+
+body[data-miniapp="true"] .tablePlayTitle,
+body[data-miniapp="true"] .tablePlayPass {
+  font-size: 12px;
+  padding: 3px 8px;
+}
+
+body[data-miniapp="true"] .handPanel {
+  position: fixed;
+  left: 10px;
+  right: 10px;
+  bottom: 5px;
+  height: 108px;
+  padding: 0 10px 6px;
+  border-radius: 9px;
+}
+
+body[data-miniapp="true"] .handHeader {
+  min-height: 30px;
+  height: 30px;
+  padding: 4px 6px;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+body[data-miniapp="true"] .handHeader h2 {
+  font-size: 14px;
+  margin-right: 8px;
+}
+
+body[data-miniapp="true"] #selectionInfo {
+  max-width: 36vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+body[data-miniapp="true"] .handActions {
+  margin-left: auto;
+  flex-wrap: nowrap;
+  gap: 6px;
+}
+
+body[data-miniapp="true"] .handActions button {
+  min-width: 54px;
+  min-height: 26px;
+  padding: 3px 7px;
+  font-size: 13px;
+}
+
+body[data-miniapp="true"] #playBtn {
+  min-width: 78px;
+  min-height: 28px;
+  font-size: 14px;
+}
+
+body[data-miniapp="true"] .hand {
+  height: 72px;
+  padding: 5px 8px 3px;
+  overflow: hidden;
+  scrollbar-width: none;
+}
+
+body[data-miniapp="true"] .hand::-webkit-scrollbar {
+  display: none;
+}
+
+body[data-miniapp="true"] .card {
+  flex: 0 0 clamp(34px, 4.85vw, 46px);
+  height: clamp(58px, 9.4vh, 70px);
+  margin-left: clamp(-10px, -1.35vw, -7px);
+  border-radius: 7px;
+  padding: 4px 4px 5px;
+}
+
+body[data-miniapp="true"] .card.selected {
+  --lift: 12px;
+}
+
+body[data-miniapp="true"] .cardCorner span {
+  font-size: clamp(15px, 3.6vh, 21px);
+}
+
+body[data-miniapp="true"] .cardCorner i {
+  font-size: clamp(10px, 2.4vh, 15px);
+}
+
+body[data-miniapp="true"] .suit {
+  font-size: clamp(18px, 4.6vh, 28px);
+}
+
+body[data-miniapp="true"] .pointBadge,
+body[data-miniapp="true"] .card em {
+  right: 3px;
+  bottom: 13px;
+  transform: scale(.78);
+  transform-origin: right bottom;
+}

@@ -3,6 +3,9 @@ const SEQ_RANKS = RANKS.slice(0, 11);
 const RANK_VALUE = Object.fromEntries(RANKS.map((rank, index) => [rank, index + 1]));
 const SUITS = ["♠", "♥", "♣", "♦"];
 const RED_SUITS = new Set(["♥", "♦"]);
+const bootParams = new URLSearchParams(window.location.search);
+const isMiniProgramView = bootParams.get("mini") === "1";
+if (isMiniProgramView) document.body.dataset.miniapp = "true";
 
 const state = {
   players: [],
@@ -493,10 +496,10 @@ function classify(cards) {
     return bombish(`${lane}路炸弹 ${ranks[0]}`, lane, RANK_VALUE[ranks[0]], cards);
   }
   if (cards.length >= 3 && ranks.length === cards.length && isContinuous(ranks)) {
-    return { valid: true, type: "singleSeq", name: `单顺 ${ranks.join("")}`, length: cards.length, high: RANK_VALUE[ranks.at(-1)], cards };
+    return { valid: true, type: "singleSeq", name: `单顺 ${ranks.join("")}`, length: cards.length, high: RANK_VALUE[ranks[ranks.length - 1]], cards };
   }
   if (cards.length >= 6 && cards.length % 2 === 0 && ranks.every(rank => counts.get(rank) === 2) && isContinuous(ranks)) {
-    return { valid: true, type: "doubleSeq", name: `双顺 ${ranks.join("")}`, length: ranks.length, high: RANK_VALUE[ranks.at(-1)], cards };
+    return { valid: true, type: "doubleSeq", name: `双顺 ${ranks.join("")}`, length: ranks.length, high: RANK_VALUE[ranks[ranks.length - 1]], cards };
   }
   return { valid: false, reason: "不符合单张、对子、顺子、双顺、炸弹或幺的规则。" };
 }
@@ -1961,7 +1964,19 @@ function renameSeat(seat, name) {
 function inviteUrl(roomId) {
   const url = new URL(window.location.href);
   url.searchParams.set("room", roomId);
+  if (isMiniProgramView) url.searchParams.set("mini", "1");
+  postMiniProgramRoom(roomId);
   return url.toString();
+}
+
+function postMiniProgramRoom(roomId) {
+  if (!roomId || !window.wx?.miniProgram?.postMessage) return;
+  window.wx.miniProgram.postMessage({
+    data: {
+      roomId,
+      title: `五人牌局 房间 ${roomId}`
+    }
+  });
 }
 
 function rememberPlayerName(name) {
@@ -2039,6 +2054,7 @@ function handleSocketMessage(message) {
     online.readySeats = {};
     online.waitingRoom = true;
     if (el.roomInput) el.roomInput.value = online.roomId;
+    postMiniProgramRoom(online.roomId);
     history.replaceState(null, "", inviteUrl(online.roomId));
     setupWaitingRoom({ resetMatch: true, preserveNames: { 0: cleanPlayerName(el.nameInput.value, "房主") } });
     state.tableNotice = `房间 ${online.roomId} 已创建，等待玩家加入`;
@@ -2057,6 +2073,7 @@ function handleSocketMessage(message) {
     online.clientId = message.clientId;
     online.connected = true;
     online.isHost = false;
+    postMiniProgramRoom(online.roomId);
     updateOnlineStatus("已加入，等待房主同步牌局");
     setJoining(true, "已加入房间", "等待房主同步牌局...");
     return;

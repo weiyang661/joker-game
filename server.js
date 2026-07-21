@@ -193,7 +193,12 @@ function handleMessage(client, message) {
       return;
     }
     leave(client);
-    const roomId = newRoomId();
+    const requestedRoomId = normalizeRequestedRoomId(message.roomId);
+    if (requestedRoomId && rooms.has(requestedRoomId)) {
+      send(client, { type: "error", message: "房号已被占用，请重新开房" });
+      return;
+    }
+    const roomId = requestedRoomId || newRoomId();
     rooms.set(roomId, { host: client, clients: new Map([[client.id, client]]) });
     client.roomId = roomId;
     client.host = true;
@@ -267,6 +272,11 @@ function newRoomId() {
     id = crypto.randomBytes(3).toString("hex").toUpperCase();
   } while (rooms.has(id));
   return id;
+}
+
+function normalizeRequestedRoomId(value) {
+  const id = String(value || "").trim().toUpperCase();
+  return /^[A-Z0-9]{6}$/.test(id) ? id : "";
 }
 
 const port = Number(process.env.PORT || 8787);

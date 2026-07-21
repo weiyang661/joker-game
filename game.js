@@ -2168,7 +2168,10 @@ el.hostBtn.addEventListener("click", async () => {
   state.players[0].avatarUrl = cleanAvatarUrl(bootParams.get("avatar"));
   online.waitingRoom = true;
   online.pendingRole = "host";
-  sendSocket({ type: "create" });
+  const requestedRoomId = bootParams.get("host") === "1"
+    ? String(bootParams.get("room") || "").trim().toUpperCase()
+    : "";
+  sendSocket({ type: "create", roomId: requestedRoomId });
   setJoining(false);
   render();
 });
@@ -2598,6 +2601,10 @@ function initInviteParams() {
   }
   if (!room) return;
   el.roomInput.value = room;
+  if (params.get("host") === "1") {
+    el.onlineStatus.textContent = `小程序房号 ${room} 已准备，正在开房。`;
+    return;
+  }
   const savedName = queryName || savedPlayerName();
   if (savedName && !el.nameInput.value.trim()) el.nameInput.value = savedName;
   el.onlineStatus.textContent = `已识别邀请房号 ${room}，准备进入房间。`;
@@ -2627,7 +2634,7 @@ function bootGame() {
     setupWaitingRoom({ resetMatch: true });
     initInviteParams();
     const room = String(bootParams.get("room") || "").trim().toUpperCase();
-    if (!room) {
+    if (!room || bootParams.get("host") === "1") {
       setTimeout(() => {
         if (!isOnlineRoomMember()) el.hostBtn.click();
       }, 120);

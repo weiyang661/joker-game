@@ -135,6 +135,23 @@ let menuScale = 1;
 let menuPosition = { left: 18, top: 62 };
 let menuDragging = null;
 let teammateView = false;
+const audioState = {
+  ctx: null,
+  enabled: false,
+  musicTimer: null,
+  beat: 0
+};
+const seenSocialEffects = new Set();
+const socialLabels = {
+  tomato: { label: "西红柿", icon: "🍅" },
+  tea: { label: "倒茶", icon: "🍵" },
+  egg: { label: "臭鸡蛋", icon: "🥚" }
+};
+const voicePresets = {
+  dede: { label: "得得得得得得得得", icon: "🎙" },
+  nice: { label: "漂亮！", icon: "👏" },
+  hurry: { label: "快点快点", icon: "⏱" }
+};
 
 function shuffle(list) {
   const copy = [...list];
@@ -207,6 +224,13 @@ function escapeAttr(value) {
   return String(value || "")
     .replace(/&/g, "&amp;")
     .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+function escapeHtml(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;");
 }
@@ -739,6 +763,8 @@ function playCards(player, cards) {
   state.lastPlayer = player.id;
   state.passes = new Set();
   state.trickPoints += cards.reduce((sum, card) => sum + card.points, 0);
+  playCardSfx();
+  broadcastSocialEffect({ id: socialEffectId(), kind: "cardSfx", from: player.id });
   state.tableNotice = `${player.name} 出 ${play.name}`;
   addLog(`${player.name} 出 ${play.name} ${formatCards(cards)}。`);
   if (!player.finished && player.hand.length === 0) finishPlayer(player);
@@ -1207,8 +1233,239 @@ function addLog(text) {
   state.log = state.log.slice(0, 80);
 }
 
+function getAudioContext() {
+  if (audioState.ctx) return audioState.ctx;
+  const AudioContext = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContext) return null;
+  audioState.ctx = new AudioContext();
+  return audioState.ctx;
+}
+
+function startAudioOnce() {
+  const ctx = getAudioContext();
+  if (!ctx) return;
+  if (ctx.state === "suspended") ctx.resume().catch(() => {});
+  if (audioState.enabled) return;
+  audioState.enabled = true;
+  startBackgroundMusic();
+}
+
+function tone(freq, duration = 0.08, volume = 0.05, type = "sine", delay = 0) {
+  const ctx = getAudioContext();
+  if (!ctx) return;
+  const now = ctx.currentTime + delay;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, now);
+  gain.gain.setValueAtTime(0.0001, now);
+  gain.gain.exponentialRampToValueAtTime(volume, now + 0.015);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+  osc.connect(gain).connect(ctx.destination);
+  osc.start(now);
+  osc.stop(now + duration + 0.02);
+}
+
+function playNoise(duration = 0.12, volume = 0.05, delay = 0) {
+  const ctx = getAudioContext();
+  if (!ctx) return;
+  const length = Math.max(1, Math.floor(ctx.sampleRate * duration));
+  const buffer = ctx.createBuffer(1, length, ctx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < length; i += 1) data[i] = (Math.random() * 2 - 1) * (1 - i / length);
+  const source = ctx.createBufferSource();
+  const gain = ctx.createGain();
+  source.buffer = buffer;
+  gain.gain.value = volume;
+  source.connect(gain).connect(ctx.destination);
+  source.start(ctx.currentTime + delay);
+}
+
+function startBackgroundMusic() {
+  if (audioState.musicTimer) return;
+  const notes = [196, 247, 294, 330, 294, 247];
+  audioState.musicTimer = setInterval(() => {
+    if (!audioState.enabled) return;
+    const note = notes[audioState.beat % notes.length];
+    tone(note, 0.16, 0.012, "triangle");
+    if (audioState.beat % 4 === 0) tone(note / 2, 0.22, 0.008, "sine", 0.02);
+    audioState.beat += 1;
+  }, 620);
+}
+
+function playCardSfx() {
+  startAudioOnce();
+  playNoise(0.08, 0.045);
+  tone(520, 0.045, 0.035, "triangle", 0.02);
+  tone(660, 0.055, 0.026, "triangle", 0.075);
+}
+
+function playInteractionSfx(kind) {
+  startAudioOnce();
+  if (kind === "tea") {
+    tone(420, 0.08, 0.035, "sine");
+    tone(640, 0.12, 0.025, "triangle", 0.09);
+    return;
+  }
+  if (kind === "egg") {
+    playNoise(0.18, 0.075);
+    tone(120, 0.12, 0.035, "sawtooth", 0.04);
+    return;
+  }
+  tone(780, 0.055, 0.04, "square");
+  playNoise(0.11, 0.065, 0.03);
+}
+
+function playVoicePresetSfx(kind) {
+  startAudioOnce();
+  const pattern = kind === "hurry" ? [500, 500, 620, 500] : kind === "nice" ? [660, 820] : [440, 460, 440, 460, 440, 460, 440, 460];
+  pattern.forEach((freq, index) => tone(freq, 0.055, 0.04, "square", index * 0.075));
+}
+
+function socialEffectId() {
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function dispatchSocialEffect(effect) {
+  const normalized = { id: socialEffectId(), from: localSeat(), ...effect };
+  if (online.connected && !online.isHost) {
+    sendSocket({ type: "action", action: "socialEffect", effect: normalized });
+    return;
+  }
+  applySocialEffect(normalized);
+  broadcastSocialEffect(normalized);
+}
+
+function broadcastSocialEffect(effect) {
+  if (!online.connected || !online.isHost) return;
+  sendSocket({ type: "relay", payload: { type: "socialEffect", effect } });
+}
+
+function applySocialEffect(effect) {
+  if (!effect || seenSocialEffects.has(effect.id)) return;
+  seenSocialEffects.add(effect.id);
+  if (seenSocialEffects.size > 80) seenSocialEffects.delete([...seenSocialEffects][0]);
+  if (effect.kind === "cardSfx") {
+    playCardSfx();
+    return;
+  }
+  if (effect.kind === "voice") {
+    showVoiceBubble(effect);
+    playVoicePresetSfx(effect.voice);
+    return;
+  }
+  showInteractionAnimation(effect);
+  playInteractionSfx(effect.kind);
+}
+
+function ensureSocialControls() {
+  if (!document.querySelector("#voiceFab")) {
+    const button = document.createElement("button");
+    button.id = "voiceFab";
+    button.className = "voiceFab";
+    button.type = "button";
+    button.textContent = "语音";
+    button.addEventListener("click", event => {
+      startAudioOnce();
+      showVoiceMenu(event);
+    });
+    document.body.appendChild(button);
+  }
+}
+
+function showVoiceMenu(event) {
+  closeFloatingSocialMenus();
+  const menu = document.createElement("div");
+  menu.className = "voiceMenu";
+  menu.innerHTML = Object.entries(voicePresets).map(([key, item]) =>
+    `<button type="button" data-voice="${key}"><span>${item.icon}</span>${item.label}</button>`
+  ).join("");
+  document.body.appendChild(menu);
+  const rect = event.currentTarget.getBoundingClientRect();
+  menu.style.left = `${Math.max(12, rect.left - 120)}px`;
+  menu.style.top = `${Math.max(12, rect.top - menu.offsetHeight - 8)}px`;
+  menu.addEventListener("click", click => {
+    const button = click.target.closest("[data-voice]");
+    if (!button) return;
+    const voice = button.dataset.voice;
+    dispatchSocialEffect({ kind: "voice", voice, text: voicePresets[voice].label });
+    menu.remove();
+  });
+}
+
+function showSocialMenu(seat, event) {
+  const targetPlayer = state.players[seat];
+  if (!targetPlayer || isWaitingEmptySeat(targetPlayer, seat)) return;
+  closeFloatingSocialMenus();
+  const panel = document.createElement("div");
+  panel.className = "socialPanel";
+  const avatar = targetPlayer.avatarUrl
+    ? `<img class="socialPanelAvatar" src="${escapeAttr(targetPlayer.avatarUrl)}" alt="">`
+    : `<span class="socialPanelAvatar socialPanelAvatarEmpty">${escapeHtml(String(targetPlayer.name || "?").slice(0, 1))}</span>`;
+  panel.innerHTML = `
+    <div class="socialPanelCard">
+      <button class="socialPanelClose" type="button" aria-label="关闭">×</button>
+      <div class="socialPanelHead">
+        ${avatar}
+        <div>
+          <strong>${escapeHtml(targetPlayer.name || `玩家 ${seat}`)}</strong>
+          <span>座位 ${seat} · ${escapeHtml(visibleTeam(targetPlayer))}</span>
+        </div>
+      </div>
+      <div class="socialGiftGrid">
+        ${Object.entries(socialLabels).map(([key, item]) =>
+          `<button type="button" class="socialGift" data-kind="${key}">
+            <span class="socialGiftIcon">${item.icon}</span>
+            <b>${item.label}</b>
+            <em>发送</em>
+          </button>`
+        ).join("")}
+      </div>
+    </div>
+  `;
+  document.body.appendChild(panel);
+  panel.addEventListener("click", click => {
+    if (click.target === panel || click.target.closest(".socialPanelClose")) {
+      panel.remove();
+      return;
+    }
+    const button = click.target.closest("[data-kind]");
+    if (!button) return;
+    dispatchSocialEffect({ kind: button.dataset.kind, to: seat });
+    panel.remove();
+  });
+}
+
+function closeFloatingSocialMenus() {
+  document.querySelectorAll(".socialMenu, .voiceMenu").forEach(node => node.remove());
+}
+
+function showInteractionAnimation(effect) {
+  const item = socialLabels[effect.kind] || socialLabels.tomato;
+  const target = document.querySelector(`.seat[data-seat="${effect.to}"]`) || document.querySelector(`.seat${relativeSeatIndex(effect.to)}`);
+  const rect = target ? target.getBoundingClientRect() : { left: window.innerWidth / 2, top: window.innerHeight / 2, width: 1, height: 1 };
+  const fly = document.createElement("div");
+  fly.className = `socialEffect socialEffect-${effect.kind}`;
+  fly.textContent = item.icon;
+  fly.style.left = `${rect.left + rect.width / 2}px`;
+  fly.style.top = `${rect.top + rect.height / 2}px`;
+  document.body.appendChild(fly);
+  setTimeout(() => fly.remove(), 1400);
+}
+
+function showVoiceBubble(effect) {
+  const from = state.players[effect.from];
+  const preset = voicePresets[effect.voice] || { label: effect.text || "语音", icon: "🎙" };
+  const bubble = document.createElement("div");
+  bubble.className = "voiceBubble";
+  bubble.innerHTML = `<strong>${escapeHtml((from && from.name) || "玩家")}</strong><span>${preset.icon} ${escapeHtml(preset.label)}</span>`;
+  document.body.appendChild(bubble);
+  setTimeout(() => bubble.remove(), 2200);
+}
+
 function render() {
   ensureSettlementOverlayInBody();
+  ensureSocialControls();
   updateActionVisibility();
   renderTable();
   renderTablePlayLayer();
@@ -1470,7 +1727,7 @@ function renderTable() {
     const avatarImage = player.avatarUrl
       ? `<img class="seatAvatarImage" src="${escapeAttr(player.avatarUrl)}" alt="">`
       : "";
-    return `<article class="seat seat${seatIndex}" style="left:${positions[seatIndex][0]};top:${positions[seatIndex][1]}">
+    return `<article class="seat seat${seatIndex}" data-seat="${index}" style="left:${positions[seatIndex][0]};top:${positions[seatIndex][1]}">
       <div class="seatTopInfo"><span>${team}</span><b>${roundScoreText}</b></div>
       <div class="seatAvatar">${avatarImage}</div>
       <div class="name">${isTurn ? "▶" : ""}${player.name}</div>
@@ -2216,12 +2473,23 @@ el.joinBtn.addEventListener("click", () => {
 });
 
 el.table.addEventListener("click", event => {
+  startAudioOnce();
   const invite = event.target.closest(".seatInviteBtn");
-  if (!invite) return;
-  const seat = Number(invite.dataset.seat);
-  if (!seat) return;
-  showSeatChoice(seat);
+  if (invite) {
+    const seat = Number(invite.dataset.seat);
+    if (!seat) return;
+    showSeatChoice(seat);
+    return;
+  }
+  const avatar = event.target.closest(".seatAvatar");
+  if (avatar) {
+    const seatNode = avatar.closest(".seat[data-seat]");
+    const seat = Number(seatNode && seatNode.dataset.seat);
+    if (Number.isFinite(seat)) showSocialMenu(seat, event);
+  }
 });
+
+document.addEventListener("pointerdown", startAudioOnce, { once: true, passive: true });
 
 el.renameBtn.addEventListener("click", () => {
   const name = cleanPlayerName(el.nameInput.value, localSeat() === 0 ? "你" : `玩家 ${localSeat()}`);
@@ -2512,6 +2780,10 @@ function handleSocketMessage(message) {
     handleRemoteAction(message.clientId, message.payload);
     return;
   }
+  if (message.type === "socialEffect") {
+    applySocialEffect(message.effect);
+    return;
+  }
   if (message.type === "snapshot") {
     if (!online.isHost && Number(message.seat) === 0) {
       setJoining(false);
@@ -2541,6 +2813,12 @@ function handleRemoteAction(clientId, message) {
   if (message.action === "ready") {
     if (!online.waitingRoom) return;
     setSeatReady(seat, !!message.ready);
+    return;
+  }
+  if (message.action === "socialEffect") {
+    const effect = { ...(message.effect || {}), from: seat };
+    applySocialEffect(effect);
+    broadcastSocialEffect(effect);
     return;
   }
   if (message.action === "snowChoice") {

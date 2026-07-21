@@ -1467,10 +1467,12 @@ function renderTable() {
       : player.id === localSeat() ? "" : `<div class="miniCards">${Array.from({ length: Math.min(player.hand.length, 10) }, () => `<span class="backCard"></span>`).join("")}</div>`;
     const revealMark = player.revealAnnouncement ? `<div class="revealMark">${player.revealAnnouncement}${revealedBigStatus(player)}</div>` : "";
     const roundScoreText = `${player.score}分`;
-    const avatarStyle = player.avatarUrl ? ` style="background-image:url('${escapeAttr(player.avatarUrl)}')"` : "";
+    const avatarImage = player.avatarUrl
+      ? `<img class="seatAvatarImage" src="${escapeAttr(player.avatarUrl)}" alt="">`
+      : "";
     return `<article class="seat seat${seatIndex}" style="left:${positions[seatIndex][0]};top:${positions[seatIndex][1]}">
       <div class="seatTopInfo"><span>${team}</span><b>${roundScoreText}</b></div>
-      <div class="seatAvatar"${avatarStyle}></div>
+      <div class="seatAvatar">${avatarImage}</div>
       <div class="name">${isTurn ? "▶" : ""}${player.name}</div>
       <div class="cardCountBadge">${player.hand.length}</div>
       <div class="scoreTag">${player.score} 分</div>
@@ -1594,15 +1596,10 @@ function teammateHandsHtml(human) {
 
 function renderSelection() {
   if (online.connected && online.waitingRoom) {
-    document.body.dataset.actionVisible = "false";
+    const mode = currentActionMode();
+    document.body.dataset.actionVisible = "true";
     el.selectionInfo.textContent = "房间准备中，开始本局后才会发牌。";
-    el.playBtn.textContent = "出牌";
-    el.passBtn.textContent = "过";
-    el.clearBtn.textContent = "取消选择";
-    el.playBtn.disabled = true;
-    el.passBtn.disabled = true;
-    el.clearBtn.disabled = true;
-    el.clearBtn.hidden = false;
+    renderActionButtons(mode);
     el.teammateBtn.disabled = true;
     el.teammateBtn.hidden = true;
     return;
@@ -1653,6 +1650,9 @@ function undecidedLocalBigs() {
 
 function currentActionMode() {
   const human = localPlayer();
+  if (online.connected && online.waitingRoom) {
+    return { type: "waiting" };
+  }
   if (state.revealPhase && !online.waitingRoom) {
     const undecided = undecidedLocalBigs();
     if (undecided.length) return { type: "reveal", count: undecided.length };
@@ -1664,7 +1664,8 @@ function currentActionMode() {
 }
 
 function shouldShowActionButtons(mode, human) {
-  if (!human || online.waitingRoom) return false;
+  if (!human) return false;
+  if (mode.type === "waiting") return true;
   if (mode.type === "reveal" || mode.type === "snow") return true;
   if (human.finished) return canViewTeammateHands();
   return !state.pendingSnowChoice
@@ -1675,6 +1676,18 @@ function shouldShowActionButtons(mode, human) {
 
 function renderActionButtons(mode) {
   el.playBtn.classList.toggle("primary", mode.type !== "snow");
+  if (mode.type === "waiting") {
+    const ready = !!online.readySeats[localSeat()];
+    el.playBtn.textContent = ready ? "取消准备" : "准备";
+    el.passBtn.textContent = "开始本局";
+    el.clearBtn.textContent = "取消选择";
+    el.playBtn.disabled = !online.connected;
+    el.passBtn.disabled = !online.connected || !online.isHost || !allJoinedPlayersReady();
+    el.clearBtn.disabled = true;
+    el.clearBtn.hidden = true;
+    el.teammateBtn.hidden = true;
+    return;
+  }
   if (mode.type === "reveal") {
     el.playBtn.textContent = mode.count >= 2 ? "亮一张" : "亮";
     el.passBtn.textContent = mode.count >= 2 ? "都不亮" : "不亮";
@@ -1958,6 +1971,10 @@ function selectedCards() {
 
 el.playBtn.addEventListener("click", () => {
   const mode = currentActionMode();
+  if (mode.type === "waiting") {
+    el.readyBtn.click();
+    return;
+  }
   if (mode.type === "reveal") {
     handleRevealChoice(mode.count >= 2 ? 1 : 1);
     return;
@@ -1981,6 +1998,10 @@ el.playBtn.addEventListener("click", () => {
 
 el.passBtn.addEventListener("click", () => {
   const mode = currentActionMode();
+  if (mode.type === "waiting") {
+    el.startOnlineBtn.click();
+    return;
+  }
   if (mode.type === "reveal") {
     handleRevealChoice(0);
     return;
@@ -2401,7 +2422,7 @@ function handleSocketMessage(message) {
       preserveProfiles: {
         0: {
           name: cleanPlayerName(el.nameInput.value, "房主"),
-          avatarUrl: savedPlayerAvatar()
+          avatarUrl: cleanAvatarUrl(bootParams.get("avatar")) || (state.players[0] && state.players[0].avatarUrl) || ""
         }
       }
     });
@@ -2579,5 +2600,20 @@ function hideInviteJoinDialog() {
   document.body.dataset.inviteJoin = "false";
 }
 
-startGame({ resetMatch: true });
-initInviteParams();
+function bootGame() {
+  if (isMiniProgramView) {
+    setupWaitingRoom({ resetMatch: true });
+    initInviteParams();
+    const room = String(bootParams.get("room") || "").trim().toUpperCase();
+    if (!room) {
+      setTimeout(() => {
+        if (!isOnlineRoomMember()) el.hostBtn.click();
+      }, 120);
+    }
+    return;
+  }
+  startGame({ resetMatch: true });
+  initInviteParams();
+}
+
+bootGame();

@@ -1289,11 +1289,21 @@ body[data-settlement="true"] .settlementOverlay {
   background-position: center;
   background-repeat: no-repeat;
   background-color: rgba(236, 244, 248, .92);
+  overflow: hidden;
 }
 
 .seat0 .seatAvatar { background: linear-gradient(135deg, #edf3fb, #b7c8d5); }
 .seat1 .seatAvatar, .seat3 .seatAvatar { background: linear-gradient(135deg, #f9ece8, #c9a29a); }
 .seat2 .seatAvatar, .seat4 .seatAvatar { background: linear-gradient(135deg, #eef2ff, #9daece); }
+
+.seatAvatarImage {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+  background: rgba(236, 244, 248, .92);
+}
 
 .seatTopInfo {
   display: inline-flex;

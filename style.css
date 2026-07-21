@@ -1091,7 +1091,7 @@ body[data-invite-join="true"] .inviteJoinDialog {
 .settlementOverlay {
   position: fixed;
   inset: 0;
-  z-index: 80;
+  z-index: 10000;
   display: none;
   align-items: center;
   justify-content: center;
@@ -1102,6 +1102,10 @@ body[data-invite-join="true"] .inviteJoinDialog {
 
 body[data-settlement="true"] .settlementOverlay {
   display: flex;
+}
+
+.settlementOverlay.show {
+  display: flex !important;
 }
 
 .settlementPanel {
@@ -1955,7 +1959,7 @@ body[data-miniapp="true"] .trickScoreBadge {
 }
 
 body[data-miniapp="true"] .settlementOverlay {
-  z-index: 120;
+  z-index: 10000;
   align-items: center;
   justify-content: center;
   padding: 0;
@@ -2098,36 +2102,36 @@ body[data-miniapp="true"] .miniCards:not(.revealedHand) {
 body[data-miniapp="true"] .tablePlaySlot {
   min-width: 112px;
   min-height: 62px;
-  transform: translate(-50%, -50%) scale(.72);
+  transform: translate(-50%, -50%) scale(.70);
 }
 
 body[data-miniapp="true"] .slot0 {
   left: 50% !important;
-  top: 55% !important;
+  top: 35% !important;
 }
 
 body[data-miniapp="true"] .slot1 {
-  left: 36% !important;
-  top: 54% !important;
+  left: 24% !important;
+  top: 55% !important;
 }
 
 body[data-miniapp="true"] .slot2 {
-  left: 36% !important;
-  top: 33% !important;
+  left: 23% !important;
+  top: 29% !important;
 }
 
 body[data-miniapp="true"] .slot3 {
-  left: 64% !important;
-  top: 33% !important;
+  left: 75% !important;
+  top: 30% !important;
 }
 
 body[data-miniapp="true"] .slot4 {
-  left: 64% !important;
-  top: 54% !important;
+  left: 75% !important;
+  top: 55% !important;
 }
 
 body[data-miniapp="true"] .tablePlayCards {
-  max-width: 220px;
+  max-width: 190px;
   min-height: 52px;
   margin-top: 0;
 }
@@ -2180,9 +2184,9 @@ body[data-miniapp="true"] .seat0 .revealMark {
 }
 
 body[data-miniapp="true"] .tablePlaySlot .tableCard {
-  width: 38px;
-  height: 56px;
-  margin-left: -8px;
+  width: 36px;
+  height: 53px;
+  margin-left: -9px;
 }
 
 body[data-miniapp="true"] .tablePlayTitle,
@@ -2208,12 +2212,12 @@ body[data-miniapp="true"] .handPanel {
 
 body[data-miniapp="true"] .handHeader {
   position: fixed;
-  left: 30%;
-  right: 25%;
-  bottom: clamp(108px, 20vh, 170px);
+  left: 32%;
+  right: 32%;
+  bottom: clamp(86px, 16vh, 132px);
   z-index: 42;
   min-height: 0;
-  height: clamp(38px, 7vh, 50px);
+  height: clamp(34px, 6.2vh, 46px);
   padding: 0;
   display: flex;
   align-items: center;
@@ -2237,29 +2241,29 @@ body[data-miniapp="true"] .handActions {
   margin: 0;
   flex-wrap: nowrap;
   justify-content: space-between;
-  gap: clamp(10px, 1.8vw, 20px);
+  gap: clamp(8px, 1.3vw, 14px);
   pointer-events: auto;
 }
 
 body[data-miniapp="true"] .handActions button {
   flex: 1 1 0;
   min-width: 0;
-  min-height: clamp(36px, 6vh, 48px);
-  padding: 5px 14px;
-  font-size: clamp(15px, 3.3vh, 20px);
+  min-height: clamp(32px, 5.5vh, 42px);
+  padding: 4px 10px;
+  font-size: clamp(14px, 3vh, 18px);
   border-radius: 10px;
 }
 
 body[data-miniapp="true"] #playBtn {
   flex: 1.2 1 0;
   min-width: 0;
-  min-height: clamp(38px, 6.5vh, 50px);
-  font-size: clamp(16px, 3.6vh, 21px);
+  min-height: clamp(34px, 5.8vh, 44px);
+  font-size: clamp(15px, 3.2vh, 19px);
 }
 
 body[data-miniapp="true"] .hand {
   height: 100%;
-  padding: 0 0 4px;
+  padding: 0 0 4px 8px;
   overflow: hidden;
   scrollbar-width: none;
 }
@@ -2274,6 +2278,10 @@ body[data-miniapp="true"] .card {
   margin-left: clamp(-15px, -1.8vw, -8px);
   border-radius: 7px;
   padding: 4px 4px 5px;
+}
+
+body[data-miniapp="true"] .hand .card:first-child {
+  margin-left: 0;
 }
 
 body[data-miniapp="true"] .card.selected {

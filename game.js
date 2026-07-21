@@ -1317,7 +1317,8 @@ function renderTablePlayLayer() {
   el.tablePlayLayer.innerHTML = state.players.map((player, index) => {
     const slotIndex = relativeSeatIndex(index);
     const play = player.lastPlay;
-    const content = !play
+    const hideStaleSelfPlay = play && state.current === player.id && player.id !== state.lastPlayer;
+    const content = !play || hideStaleSelfPlay
       ? ""
       : play.cards.length
       ? `${isMiniProgramView ? "" : `<div class="tablePlayTitle">${player.name} · ${play.name}</div>`}<div class="tablePlayCards">${play.cards.map(tableCard).join("")}</div>`
@@ -1646,8 +1647,10 @@ function renderPanels() {
 
 function renderSettlementOverlay() {
   if (!el.settlementOverlay) return;
-  const show = state.roundSettled && state.gameOver && !state.continuingForNextLead;
+  const show = state.roundSettled && state.gameOver && state.lastSettlement.length > 0;
   document.body.dataset.settlement = show ? "true" : "false";
+  el.settlementOverlay.classList.toggle("show", show);
+  el.settlementOverlay.style.display = show ? "flex" : "";
   if (!show) return;
   const local = localPlayer();
   const localSettlement = state.lastSettlement.find(item => item.playerId === local?.id);
@@ -1678,8 +1681,13 @@ function renderSettlementOverlay() {
     }).join("");
   }
   if (el.settlementNextBtn) {
-    el.settlementNextBtn.disabled = online.connected && !online.isHost;
-    el.settlementNextBtn.textContent = online.connected && !online.isHost ? "等待房主下一局" : "下一局";
+    const waitingForHeadRunner = state.continuingForNextLead;
+    el.settlementNextBtn.disabled = waitingForHeadRunner || online.connected && !online.isHost;
+    el.settlementNextBtn.textContent = waitingForHeadRunner
+      ? "等待头跑"
+      : online.connected && !online.isHost
+      ? "等待房主下一局"
+      : "下一局";
   }
 }
 

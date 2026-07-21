@@ -5,7 +5,28 @@ const SUITS = ["♠", "♥", "♣", "♦"];
 const RED_SUITS = new Set(["♥", "♦"]);
 const bootParams = new URLSearchParams(window.location.search);
 const isMiniProgramView = bootParams.get("mini") === "1";
-if (isMiniProgramView) document.body.dataset.miniapp = "true";
+if (isMiniProgramView) {
+  document.body.dataset.miniapp = "true";
+  updateMiniViewportSize();
+  window.addEventListener("resize", updateMiniViewportSize);
+  window.visualViewport?.addEventListener("resize", updateMiniViewportSize);
+  window.visualViewport?.addEventListener("scroll", updateMiniViewportSize);
+  requestAnimationFrame(updateMiniViewportSize);
+  setTimeout(updateMiniViewportSize, 300);
+  setTimeout(updateMiniViewportSize, 1000);
+}
+
+function updateMiniViewportSize() {
+  if (!isMiniProgramView) return;
+  const viewport = window.visualViewport;
+  const width = Math.max(1, Math.round(viewport?.width || window.innerWidth || document.documentElement.clientWidth || screen.width));
+  const height = Math.max(1, Math.round(viewport?.height || window.innerHeight || document.documentElement.clientHeight || screen.height));
+  document.documentElement.style.setProperty("--mini-vw", `${width}px`);
+  document.documentElement.style.setProperty("--mini-vh", `${height}px`);
+  document.body?.style.setProperty("--mini-vw", `${width}px`);
+  document.body?.style.setProperty("--mini-vh", `${height}px`);
+  document.body.dataset.miniReady = "true";
+}
 
 const state = {
   players: [],

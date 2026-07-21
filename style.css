@@ -1557,6 +1557,9 @@ body[data-invite-join="true"] .inviteJoinDialog {
 
 body[data-miniapp="true"] {
   overflow: hidden;
+  width: var(--mini-vw, 100vw);
+  height: var(--mini-vh, 100vh);
+  min-height: var(--mini-vh, 100vh);
   background:
     radial-gradient(circle at 16% 18%, rgba(255, 255, 255, .14), transparent 9%),
     radial-gradient(circle at 88% 12%, rgba(100, 151, 86, .22), transparent 13%),
@@ -1564,10 +1567,22 @@ body[data-miniapp="true"] {
 }
 
 body[data-miniapp="true"] .app {
-  width: 100vw;
-  height: 100vh;
-  height: 100svh;
+  width: var(--mini-vw, 100vw);
+  height: var(--mini-vh, 100vh);
+  min-height: 0;
   padding: 0 4px;
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+}
+
+body[data-miniapp="true"] .layout {
+  position: fixed;
+  inset: 0;
+  width: var(--mini-vw, 100vw);
+  height: var(--mini-vh, 100vh);
+  min-height: 0;
+  overflow: hidden;
 }
 
 body[data-miniapp="true"] .topbar {
@@ -1619,6 +1634,7 @@ body[data-miniapp="true"] .tableWrap {
   right: 4px;
   top: 4px;
   bottom: 104px;
+  z-index: 4;
   height: auto;
   min-height: 0;
   margin: 0;
@@ -1800,6 +1816,7 @@ body[data-miniapp="true"] .handPanel {
   left: 4px;
   right: 4px;
   bottom: 2px;
+  z-index: 32;
   height: 100px;
   padding: 0 8px 5px;
   border-radius: 9px;

@@ -195,6 +195,22 @@ function cleanPlayerName(name, fallback = "玩家") {
   return String(name || "").trim().slice(0, 10) || fallback;
 }
 
+function cleanAvatarUrl(url) {
+  const value = String(url || "").trim();
+  if (!value) return "";
+  if (value.startsWith("/uploads/")) return value;
+  if (/^https:\/\/[a-z0-9.-]+\/uploads\/[-a-z0-9._%]+$/i.test(value)) return value;
+  return "";
+}
+
+function escapeAttr(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
 function localSeat() {
   return online.connected ? online.seat : 0;
 }
@@ -230,16 +246,35 @@ function preservedOnlineNames() {
   return names;
 }
 
+function preservedOnlineProfiles() {
+  const profiles = {};
+  state.players.forEach((player, index) => {
+    if (!player) return;
+    profiles[index] = { name: player.name, avatarUrl: player.avatarUrl || "" };
+  });
+  return profiles;
+}
+
+function playerProfileForSeat(seat, fallbackName = "", profiles = {}) {
+  const profile = profiles[seat] || {};
+  return {
+    name: profile.name || fallbackName,
+    avatarUrl: cleanAvatarUrl(profile.avatarUrl)
+  };
+}
+
 function isOnlineHumanSeat(index) {
   if (!online.connected) return index === 0;
   if (index === 0 && online.isHost) return true;
   return Object.prototype.hasOwnProperty.call(online.seatClients, index);
 }
 
-function makeLobbyPlayer(index, name) {
+function makeLobbyPlayer(index, name, profiles = {}) {
+  const profile = playerProfileForSeat(index, name || (index === 0 ? playerNameFallback() : `人机 ${index}`), profiles);
   return {
     id: index,
-    name: name || (index === 0 ? playerNameFallback() : `人机 ${index}`),
+    name: profile.name,
+    avatarUrl: profile.avatarUrl,
     hand: [],
     team: "plain",
     knownTeam: false,
@@ -260,8 +295,12 @@ function setupWaitingRoom(options = {}) {
     state.playerMatch = [0, 0, 0, 0, 0];
     state.firstFinisherNext = 0;
   }
+  const preservedProfiles = { ...preservedOnlineProfiles(), ...(options.preserveProfiles || {}) };
   const preservedNames = { ...preservedOnlineNames(), ...(options.preserveNames || {}) };
-  state.players = Array.from({ length: 5 }, (_, index) => makeLobbyPlayer(index, preservedNames[index]));
+  Object.keys(preservedNames).forEach(seat => {
+    preservedProfiles[seat] = { ...(preservedProfiles[seat] || {}), name: preservedNames[seat] };
+  });
+  state.players = Array.from({ length: 5 }, (_, index) => makeLobbyPlayer(index, preservedNames[index], preservedProfiles));
   state.current = 0;
   state.leader = 0;
   state.lastPlayer = null;
@@ -327,11 +366,16 @@ function startGame(options = {}) {
     state.playerMatch = [0, 0, 0, 0, 0];
     state.firstFinisherNext = 0;
   }
+  const preservedProfiles = { ...preservedOnlineProfiles(), ...(options.preserveProfiles || {}) };
   const preservedNames = { ...preservedOnlineNames(), ...(options.preserveNames || {}) };
+  Object.keys(preservedNames).forEach(seat => {
+    preservedProfiles[seat] = { ...(preservedProfiles[seat] || {}), name: preservedNames[seat] };
+  });
   const deck = shuffle(makeDeck());
   state.players = Array.from({ length: 5 }, (_, index) => ({
     id: index,
-    name: preservedNames[index] || (index === 0 ? playerNameFallback() : `人机 ${index}`),
+    name: playerProfileForSeat(index, preservedNames[index] || (index === 0 ? playerNameFallback() : `人机 ${index}`), preservedProfiles).name,
+    avatarUrl: playerProfileForSeat(index, preservedNames[index] || (index === 0 ? playerNameFallback() : `人机 ${index}`), preservedProfiles).avatarUrl,
     hand: deck.slice(index * 20, index * 20 + 20),
     team: "plain",
     knownTeam: false,
@@ -1409,9 +1453,10 @@ function renderTable() {
       : player.id === localSeat() ? "" : `<div class="miniCards">${Array.from({ length: Math.min(player.hand.length, 10) }, () => `<span class="backCard"></span>`).join("")}</div>`;
     const revealMark = player.revealAnnouncement ? `<div class="revealMark">${player.revealAnnouncement}${revealedBigStatus(player)}</div>` : "";
     const roundScoreText = `${player.score}分`;
+    const avatarStyle = player.avatarUrl ? ` style="background-image:url('${escapeAttr(player.avatarUrl)}')"` : "";
     return `<article class="seat seat${seatIndex}" style="left:${positions[seatIndex][0]};top:${positions[seatIndex][1]}">
       <div class="seatTopInfo"><span>${team}</span><b>${roundScoreText}</b></div>
-      <div class="seatAvatar"></div>
+      <div class="seatAvatar"${avatarStyle}></div>
       <div class="name">${isTurn ? "▶" : ""}${player.name}</div>
       <div class="cardCountBadge">${player.hand.length}</div>
       <div class="scoreTag">${player.score} 分</div>
@@ -2081,6 +2126,7 @@ el.hostBtn.addEventListener("click", async () => {
   online.seat = 0;
   online.hasSnapshot = true;
   state.players[0].name = cleanPlayerName(el.nameInput.value, "房主");
+  state.players[0].avatarUrl = rememberPlayerAvatar(bootParams.get("avatar") || savedPlayerAvatar());
   rememberPlayerName(state.players[0].name);
   online.waitingRoom = true;
   online.pendingRole = "host";
@@ -2119,7 +2165,8 @@ async function joinRoomFromInputs(options = {}) {
   online.readySeats = {};
   online.hasSnapshot = false;
   online.pendingRole = "join";
-  sendSocket({ type: "join", roomId, seat: requestedSeat, name });
+  const avatarUrl = rememberPlayerAvatar(options.avatarUrl || bootParams.get("avatar") || savedPlayerAvatar());
+  sendSocket({ type: "join", roomId, seat: requestedSeat, name, avatarUrl });
   updateOnlineStatus("正在加入房间，等待房主同步牌局...");
   setJoining(true, "已发送加入请求", "等待房主同步牌局，请不要重复点击。");
 }
@@ -2132,7 +2179,7 @@ el.renameBtn.addEventListener("click", () => {
   const name = cleanPlayerName(el.nameInput.value, localSeat() === 0 ? "你" : `玩家 ${localSeat()}`);
   rememberPlayerName(name);
   if (online.connected && !online.isHost) {
-    sendSocket({ type: "action", action: "rename", name });
+    sendSocket({ type: "action", action: "rename", name, avatarUrl: savedPlayerAvatar() });
     return;
   }
   renameSeat(localSeat(), name);
@@ -2199,9 +2246,27 @@ function rememberPlayerName(name) {
   }
 }
 
+function rememberPlayerAvatar(url) {
+  const avatarUrl = cleanAvatarUrl(url);
+  try {
+    if (avatarUrl) localStorage.setItem("jokerPlayerAvatar", avatarUrl);
+  } catch {
+    // ignore storage failures in private browsing
+  }
+  return avatarUrl;
+}
+
 function savedPlayerName() {
   try {
     return localStorage.getItem("jokerPlayerName") || "";
+  } catch {
+    return "";
+  }
+}
+
+function savedPlayerAvatar() {
+  try {
+    return cleanAvatarUrl(localStorage.getItem("jokerPlayerAvatar") || "");
   } catch {
     return "";
   }
@@ -2268,7 +2333,15 @@ function handleSocketMessage(message) {
     if (el.roomInput) el.roomInput.value = online.roomId;
     postMiniProgramRoom(online.roomId);
     history.replaceState(null, "", inviteUrl(online.roomId));
-    setupWaitingRoom({ resetMatch: true, preserveNames: { 0: cleanPlayerName(el.nameInput.value, "房主") } });
+    setupWaitingRoom({
+      resetMatch: true,
+      preserveProfiles: {
+        0: {
+          name: cleanPlayerName(el.nameInput.value, "房主"),
+          avatarUrl: savedPlayerAvatar()
+        }
+      }
+    });
     state.tableNotice = `房间 ${online.roomId} 已创建，等待玩家加入`;
     addLog(`房间 ${online.roomId} 已创建，所有已入房玩家准备后再发牌。`);
     updateOnlineStatus();
@@ -2301,6 +2374,7 @@ function handleSocketMessage(message) {
     online.clientSeats[message.clientId] = seat;
     delete online.readySeats[seat];
     state.players[seat].name = message.name || `玩家 ${seat}`;
+    state.players[seat].avatarUrl = cleanAvatarUrl(message.avatarUrl);
     state.players[seat].human = true;
     const moved = requestedSeat !== seat;
     state.tableNotice = online.waitingRoom
@@ -2351,6 +2425,7 @@ function handleRemoteAction(clientId, message) {
   if (!player) return;
   if (message.action === "rename") {
     renameSeat(seat, message.name);
+    if (message.avatarUrl && player) player.avatarUrl = cleanAvatarUrl(message.avatarUrl);
     render();
     return;
   }
@@ -2405,13 +2480,23 @@ function updateOnlineStatus(extra = "") {
 function initInviteParams() {
   const params = new URLSearchParams(window.location.search);
   const room = String(params.get("room") || "").trim().toUpperCase();
+  const queryName = cleanPlayerName(params.get("name") || "", "");
+  const queryAvatar = rememberPlayerAvatar(params.get("avatar") || "");
+  if (queryName && !el.nameInput.value.trim()) {
+    el.nameInput.value = queryName;
+    rememberPlayerName(queryName);
+  }
+  if (state.players[0]) {
+    if (queryName) state.players[0].name = queryName;
+    if (queryAvatar) state.players[0].avatarUrl = queryAvatar;
+  }
   if (!room) return;
   el.roomInput.value = room;
-  const savedName = savedPlayerName();
+  const savedName = queryName || savedPlayerName();
   if (savedName && !el.nameInput.value.trim()) el.nameInput.value = savedName;
   el.onlineStatus.textContent = `已识别邀请房号 ${room}，准备进入房间。`;
   if (savedName) {
-    joinRoomFromInputs({ roomId: room, name: savedName });
+    joinRoomFromInputs({ roomId: room, name: savedName, avatarUrl: queryAvatar || savedPlayerAvatar() });
     return;
   }
   showInviteJoinDialog(room);

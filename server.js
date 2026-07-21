@@ -4,12 +4,17 @@ const fs = require("fs");
 const path = require("path");
 
 const root = __dirname;
+const uploadRoot = path.join(root, "uploads");
 const rooms = new Map();
 const startedAt = Date.now();
 const version = "2026-07-11-room-role-lock";
 
 const server = http.createServer((req, res) => {
   const urlPath = decodeURIComponent(req.url.split("?")[0]);
+  if (req.method === "POST" && urlPath === "/api/avatar") {
+    handleAvatarUpload(req, res);
+    return;
+  }
   if (urlPath === "/healthz") {
     const body = JSON.stringify({ ok: true, version, rooms: rooms.size, uptimeMs: Date.now() - startedAt });
     res.writeHead(200, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" });
@@ -27,11 +32,54 @@ const server = http.createServer((req, res) => {
       return;
     }
     const ext = path.extname(filePath);
-    const types = { ".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8", ".js": "application/javascript; charset=utf-8" };
+    const types = {
+      ".html": "text/html; charset=utf-8",
+      ".css": "text/css; charset=utf-8",
+      ".js": "application/javascript; charset=utf-8",
+      ".png": "image/png",
+      ".jpg": "image/jpeg",
+      ".jpeg": "image/jpeg",
+      ".webp": "image/webp"
+    };
     res.writeHead(200, { "Content-Type": types[ext] || "application/octet-stream", "Cache-Control": "no-store" });
     res.end(data);
   });
 });
+
+function handleAvatarUpload(req, res) {
+  let body = "";
+  req.setEncoding("utf8");
+  req.on("data", chunk => {
+    body += chunk;
+    if (body.length > 4 * 1024 * 1024) req.destroy();
+  });
+  req.on("end", () => {
+    try {
+      const data = JSON.parse(body || "{}");
+      const match = String(data.image || "").match(/^data:image\/(png|jpe?g|webp);base64,([a-z0-9+/=]+)$/i);
+      if (!match) {
+        res.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
+        res.end(JSON.stringify({ ok: false, message: "invalid image" }));
+        return;
+      }
+      const ext = match[1].toLowerCase().replace("jpeg", "jpg");
+      const buffer = Buffer.from(match[2], "base64");
+      if (!buffer.length || buffer.length > 1024 * 1024) {
+        res.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
+        res.end(JSON.stringify({ ok: false, message: "image too large" }));
+        return;
+      }
+      fs.mkdirSync(uploadRoot, { recursive: true });
+      const fileName = `${Date.now()}-${crypto.randomBytes(5).toString("hex")}.${ext}`;
+      fs.writeFileSync(path.join(uploadRoot, fileName), buffer);
+      res.writeHead(200, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" });
+      res.end(JSON.stringify({ ok: true, avatarUrl: `/uploads/${fileName}` }));
+    } catch {
+      res.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
+      res.end(JSON.stringify({ ok: false, message: "bad request" }));
+    }
+  });
+}
 
 server.on("upgrade", (req, socket) => {
   const key = req.headers["sec-websocket-key"];
@@ -164,7 +212,7 @@ function handleMessage(client, message) {
     client.roomId = String(message.roomId).toUpperCase();
     client.host = false;
     send(client, { type: "joined", roomId: client.roomId, clientId: client.id });
-    send(room.host, { type: "joinRequest", clientId: client.id, seat: message.seat, name: message.name || "玩家" });
+    send(room.host, { type: "joinRequest", clientId: client.id, seat: message.seat, name: message.name || "玩家", avatarUrl: message.avatarUrl || "" });
     return;
   }
   const room = rooms.get(client.roomId);

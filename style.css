@@ -225,6 +225,11 @@ body[data-menu="hidden"] .topActions button:not(#menuToggleBtn) {
   display: none;
 }
 
+body[data-table-only="true"] .topbar,
+body[data-table-only="true"] .scoreboard {
+  display: none;
+}
+
 .onlineBox {
   grid-row: span 3;
   padding: 0;
@@ -1034,6 +1039,161 @@ body[data-invite-join="true"] .inviteJoinDialog {
   font-weight: 800;
 }
 
+.trickScoreBadge {
+  color: #ffe48a;
+  font-size: clamp(38px, 7.2vw, 92px);
+  font-weight: 900;
+  line-height: .95;
+  text-shadow: 0 4px 8px rgba(0, 0, 0, .38), 0 0 16px rgba(255, 231, 130, .34);
+}
+
+.trickScoreBadge span {
+  margin-left: .08em;
+  font-size: .72em;
+}
+
+.settlementOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(16px, 3vw, 48px);
+  background: rgba(2, 12, 14, .52);
+  backdrop-filter: blur(2px);
+}
+
+body[data-settlement="true"] .settlementOverlay {
+  display: flex;
+}
+
+.settlementPanel {
+  position: relative;
+  width: min(1180px, 92vw);
+  min-height: min(520px, 78vh);
+  display: grid;
+  grid-template-columns: minmax(250px, .9fr) minmax(520px, 1.8fr);
+  align-items: stretch;
+  overflow: hidden;
+  border-radius: 10px;
+  box-shadow: 0 28px 90px rgba(0, 0, 0, .48);
+  background: linear-gradient(100deg, rgba(34, 184, 222, .94) 0 31%, rgba(247, 251, 246, .97) 31% 100%);
+}
+
+.settlementResult {
+  display: grid;
+  place-items: center;
+  padding: 34px;
+  color: #eef9ff;
+  font-size: clamp(54px, 8vw, 120px);
+  font-weight: 900;
+  letter-spacing: .08em;
+  text-shadow: 0 6px 12px rgba(28, 80, 150, .42);
+}
+
+.settlementResult[data-result="lose"] {
+  color: #d9edff;
+}
+
+.settlementResult::after {
+  content: "WIN";
+  position: absolute;
+  left: 7.8%;
+  top: 57%;
+  color: rgba(255, 255, 255, .92);
+  font-size: clamp(18px, 2.8vw, 38px);
+  letter-spacing: .08em;
+}
+
+.settlementResult[data-result="lose"]::after {
+  content: "LOSE";
+}
+
+.settlementBoard {
+  padding: 28px 42px 94px;
+  color: #26333c;
+}
+
+.settlementTitle {
+  margin-bottom: 18px;
+  color: #43515b;
+  font-size: clamp(18px, 2vw, 28px);
+  font-weight: 900;
+  text-align: right;
+}
+
+.settlementHead,
+.settlementRow {
+  display: grid;
+  grid-template-columns: 1.6fr .8fr .7fr .7fr;
+  align-items: center;
+  gap: 14px;
+}
+
+.settlementHead {
+  padding: 0 18px 10px;
+  color: #8d8a82;
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.settlementRows {
+  display: grid;
+  gap: 2px;
+}
+
+.settlementRow {
+  min-height: 72px;
+  padding: 8px 18px;
+  border-bottom: 1px solid rgba(42, 77, 92, .12);
+  font-size: clamp(18px, 2.1vw, 30px);
+  font-weight: 800;
+}
+
+.settlementRow.self {
+  background: linear-gradient(90deg, rgba(255, 203, 93, .38), rgba(255, 235, 176, .12));
+  outline: 2px solid rgba(224, 163, 56, .35);
+}
+
+.settlementRow b {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settlementRow small {
+  display: block;
+  color: #73808a;
+  font-size: .48em;
+  font-weight: 700;
+}
+
+.settlementRow .plus {
+  color: #e34a25;
+}
+
+.settlementRow .minus {
+  color: #3568c8;
+}
+
+.settlementNextBtn {
+  position: absolute;
+  right: 42px;
+  bottom: 26px;
+  min-width: 210px;
+  min-height: 58px;
+  border: 0;
+  border-radius: 8px;
+  background: linear-gradient(#35d67b, #08a956);
+  color: #fff;
+  font-size: 28px;
+  font-weight: 900;
+  box-shadow: 0 9px 18px rgba(2, 74, 42, .28), inset 0 1px 0 rgba(255,255,255,.28);
+}
+
 .seat {
   position: absolute;
   width: 170px;
@@ -1045,7 +1205,10 @@ body[data-invite-join="true"] .inviteJoinDialog {
 }
 
 .seat::before {
-  content: "";
+  content: none;
+}
+
+.seatAvatar {
   display: block;
   width: 56px;
   height: 56px;
@@ -1058,9 +1221,50 @@ body[data-invite-join="true"] .inviteJoinDialog {
   box-shadow: 0 6px 16px rgba(0,0,0,.28);
 }
 
-.seat0::before { background: linear-gradient(135deg, #edf3fb, #b7c8d5); }
-.seat1::before, .seat3::before { background: linear-gradient(135deg, #f9ece8, #c9a29a); }
-.seat2::before, .seat4::before { background: linear-gradient(135deg, #eef2ff, #9daece); }
+.seat0 .seatAvatar { background: linear-gradient(135deg, #edf3fb, #b7c8d5); }
+.seat1 .seatAvatar, .seat3 .seatAvatar { background: linear-gradient(135deg, #f9ece8, #c9a29a); }
+.seat2 .seatAvatar, .seat4 .seatAvatar { background: linear-gradient(135deg, #eef2ff, #9daece); }
+
+.seatTopInfo {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 4px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(0,0,0,.42);
+  color: #fff3bd;
+  font-size: 12px;
+  font-weight: 900;
+  white-space: nowrap;
+  box-shadow: 0 3px 9px rgba(0,0,0,.2);
+}
+
+.seatTopInfo b {
+  color: #fff;
+  font: inherit;
+}
+
+.cardCountBadge {
+  position: absolute;
+  right: 22px;
+  top: 34px;
+  min-width: 24px;
+  height: 34px;
+  padding: 2px 3px;
+  display: grid;
+  place-items: center;
+  border-radius: 5px;
+  background:
+    radial-gradient(circle at 28% 24%, rgba(255,255,255,.38), transparent 18%),
+    linear-gradient(135deg, #2f77bf, #123a75 62%, #071b3a);
+  border: 1px solid rgba(255,255,255,.64);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 900;
+  box-shadow: 0 4px 10px rgba(0,0,0,.28);
+}
 
 .scoreTag {
   display: inline-block;
@@ -1655,18 +1859,19 @@ body[data-miniapp="true"] .tableWrap::after {
 
 body[data-miniapp="true"] .tableCenter {
   left: 50%;
-  top: 15%;
-  width: 58%;
+  top: 49%;
+  width: 34%;
   min-height: 0;
   transform: translate(-50%, -50%);
-  padding: 5px 10px;
-  border-radius: 999px;
-  background: rgba(4, 29, 28, .62);
-  box-shadow: 0 6px 18px rgba(0, 0, 0, .18);
+  padding: 3px 8px;
+  border-radius: 18px;
+  background: transparent;
+  box-shadow: none;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 3px;
   flex-wrap: nowrap;
   overflow: hidden;
 }
@@ -1703,13 +1908,60 @@ body[data-miniapp="true"] .tableCenter .centerLine {
   color: rgba(248, 241, 223, .86);
 }
 
+body[data-miniapp="true"] .trickScoreBadge {
+  font-size: clamp(28px, 10vh, 54px);
+}
+
+body[data-miniapp="true"] .settlementOverlay {
+  padding: 8px 18px;
+}
+
+body[data-miniapp="true"] .settlementPanel {
+  width: min(980px, calc(var(--mini-vw, 100vw) - 36px));
+  min-height: min(330px, calc(var(--mini-vh, 100vh) - 24px));
+  grid-template-columns: minmax(160px, .62fr) minmax(420px, 1.8fr);
+}
+
+body[data-miniapp="true"] .settlementResult {
+  padding: 18px;
+  font-size: clamp(38px, 13vh, 72px);
+}
+
+body[data-miniapp="true"] .settlementBoard {
+  padding: 14px 24px 58px;
+}
+
+body[data-miniapp="true"] .settlementTitle {
+  margin-bottom: 8px;
+  font-size: clamp(14px, 4vh, 20px);
+}
+
+body[data-miniapp="true"] .settlementHead {
+  padding: 0 12px 5px;
+  font-size: 12px;
+}
+
+body[data-miniapp="true"] .settlementRow {
+  min-height: 42px;
+  padding: 4px 12px;
+  font-size: clamp(13px, 4vh, 20px);
+}
+
+body[data-miniapp="true"] .settlementNextBtn {
+  right: 24px;
+  bottom: 12px;
+  min-width: 130px;
+  min-height: 40px;
+  font-size: 20px;
+}
+
 body[data-miniapp="true"] .seat {
   width: 108px;
   min-height: 78px;
   transform: translate(-50%, -50%) scale(.70);
 }
 
-body[data-miniapp="true"] .seat::before {
+body[data-miniapp="true"] .seatAvatar {
   width: 50px;
   height: 50px;
   margin-bottom: 3px;
@@ -1744,6 +1996,7 @@ body[data-miniapp="true"] .scoreTag {
   font-size: 12px;
   padding: 2px 6px;
   margin-bottom: 3px;
+  display: none;
 }
 
 body[data-miniapp="true"] .seat .name {
@@ -1757,10 +2010,30 @@ body[data-miniapp="true"] .seat .meta {
   font-size: 10px;
 }
 
+body[data-miniapp="true"] .seatTopInfo {
+  max-width: 116px;
+  margin-bottom: 3px;
+  padding: 2px 6px;
+  gap: 4px;
+  font-size: 11px;
+}
+
+body[data-miniapp="true"] .cardCountBadge {
+  right: 18px;
+  top: 28px;
+  min-width: 20px;
+  height: 29px;
+  font-size: 12px;
+}
+
 body[data-miniapp="true"] .miniCards {
   margin-top: 4px;
   transform: scale(.70);
   transform-origin: top center;
+}
+
+body[data-miniapp="true"] .miniCards:not(.revealedHand) {
+  display: none;
 }
 
 body[data-miniapp="true"] .tablePlaySlot {

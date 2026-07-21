@@ -99,7 +99,12 @@ const el = {
   inviteJoinDialog: document.querySelector("#inviteJoinDialog"),
   inviteRoomLabel: document.querySelector("#inviteRoomLabel"),
   inviteNameInput: document.querySelector("#inviteNameInput"),
-  inviteJoinBtn: document.querySelector("#inviteJoinBtn")
+  inviteJoinBtn: document.querySelector("#inviteJoinBtn"),
+  settlementOverlay: document.querySelector("#settlementOverlay"),
+  settlementResult: document.querySelector("#settlementResult"),
+  settlementTitle: document.querySelector("#settlementTitle"),
+  settlementRows: document.querySelector("#settlementRows"),
+  settlementNextBtn: document.querySelector("#settlementNextBtn")
 };
 
 const online = {
@@ -1151,6 +1156,7 @@ function render() {
   renderTablePlayLayer();
   renderHand();
   renderPanels();
+  renderSettlementOverlay();
   broadcastSnapshot();
 }
 
@@ -1274,22 +1280,16 @@ function renderTableCenter() {
       : `轮到：${player?.name || "无"}`;
     const snowText = state.pendingSnowChoice ? `${teamName(state.pendingSnowChoice.winnerTeam)}选择雪局` : "";
     el.tableCenter.innerHTML = `
-      <div class="phasePill">${phase}</div>
-      <div class="centerNotice">${state.tableNotice || "牌局进行中"}</div>
-      <div class="centerLine">${snowText || turnText}</div>
-      <div class="centerLine">本墩 ${state.trickPoints} 分 · 大王 ${remainingBigCount()} 张</div>
-      ${settlement}
+      <div class="trickScoreBadge">${state.trickPoints}<span>分</span></div>
+      <div class="centerLine">${snowText || turnText || state.tableNotice || phase}</div>
     `;
     return;
   }
   el.tableCenter.innerHTML = `
-    <div class="phasePill">${phase}</div>
-    <div class="centerNotice">${state.tableNotice || "牌局进行中"}</div>
+    <div class="trickScoreBadge">${state.trickPoints}<span>分</span></div>
     ${current}
-    <div class="centerLine">本墩分：<strong>${state.trickPoints}</strong></div>
-    <div class="centerLine">牌局中剩余大王：<strong>${remainingBigCount()}</strong> 张</div>
+    <div class="centerLine">${state.tableNotice || phase} · 大王 ${remainingBigCount()} 张</div>
     ${snowChoice}
-    ${settlement}
   `;
 }
 
@@ -1355,13 +1355,14 @@ function renderTable() {
       ? `<div class="miniCards revealedHand">${player.hand.map(tinyCard).join("")}</div>`
       : player.id === localSeat() ? "" : `<div class="miniCards">${Array.from({ length: Math.min(player.hand.length, 10) }, () => `<span class="backCard"></span>`).join("")}</div>`;
     const revealMark = player.revealAnnouncement ? `<div class="revealMark">${player.revealAnnouncement}${revealedBigStatus(player)}</div>` : "";
-    const matchLine = player.roundDelta
-      ? `总分 ${player.matchScore || 0} · 本局 ${formatSigned(player.roundDelta)}`
-      : `总分 ${player.matchScore || 0}`;
+    const roundScoreText = `${player.score}分`;
     return `<article class="seat seat${seatIndex}" style="left:${positions[seatIndex][0]};top:${positions[seatIndex][1]}">
-      <div class="scoreTag">${player.score} 分 · ${matchLine}</div>
-      <div class="name">${isTurn ? "▶" : ""}${player.name}<span class="badge">${player.hand.length} 张</span></div>
-      <div class="meta">${team}${player.finished ? " · 已出完" : ""}</div>
+      <div class="seatTopInfo"><span>${team}</span><b>${roundScoreText}</b></div>
+      <div class="seatAvatar"></div>
+      <div class="name">${isTurn ? "▶" : ""}${player.name}</div>
+      <div class="cardCountBadge">${player.hand.length}</div>
+      <div class="scoreTag">${player.score} 分</div>
+      <div class="meta">${player.finished ? "已出完" : ""}</div>
       ${revealMark}
       ${handPreview}
     </article>`;
@@ -1589,6 +1590,8 @@ function laneName(lane) {
 
 function renderPanels() {
   normalizeScores();
+  const tableOnly = !online.waitingRoom;
+  document.body.dataset.tableOnly = tableOnly ? "true" : "false";
   document.body.dataset.menu = menuMode;
   applyMenuLayout();
   el.menuToggleBtn.textContent = menuMode === "full" ? "缩小菜单" : menuMode === "mini" ? "收起菜单" : "展开菜单";
@@ -1624,6 +1627,45 @@ function renderPanels() {
     : state.revealPhase ? "等待亮王阶段结束。" : "新回合，任意合法牌型都可以出。";
   el.log.innerHTML = state.log.map(item => `<div class="logItem">${item}</div>`).join("");
   renderRevealBox();
+}
+
+function renderSettlementOverlay() {
+  if (!el.settlementOverlay) return;
+  const show = state.roundSettled && state.gameOver && !state.continuingForNextLead;
+  document.body.dataset.settlement = show ? "true" : "false";
+  if (!show) return;
+  const local = localPlayer();
+  const localSettlement = state.lastSettlement.find(item => item.playerId === local?.id);
+  const localDelta = localSettlement?.delta || 0;
+  const winnerItem = state.lastSettlement.find(item => item.delta > 0);
+  const winnerTeam = state.players[winnerItem?.playerId]?.team || (localDelta >= 0 ? local?.team : opponentTeam(local?.team));
+  const localWon = localDelta >= 0;
+  if (el.settlementResult) {
+    el.settlementResult.textContent = localWon ? "胜利" : "失败";
+    el.settlementResult.dataset.result = localWon ? "win" : "lose";
+  }
+  if (el.settlementTitle) {
+    el.settlementTitle.textContent = state.tableNotice || `${teamName(winnerTeam)}获胜 · 本局结算`;
+  }
+  if (el.settlementRows) {
+    el.settlementRows.innerHTML = state.lastSettlement.map(item => {
+      const player = state.players[item.playerId];
+      const isSelf = item.playerId === local?.id;
+      const deltaClass = item.delta >= 0 ? "plus" : "minus";
+      return `
+        <div class="settlementRow ${isSelf ? "self" : ""}">
+          <span><b>${isSelf ? "你" : player?.name || item.name}</b><small>${item.name}</small></span>
+          <span>${teamName(player?.team)}</span>
+          <span class="${deltaClass}">${formatSigned(item.delta)}</span>
+          <span>${item.total}</span>
+        </div>
+      `;
+    }).join("");
+  }
+  if (el.settlementNextBtn) {
+    el.settlementNextBtn.disabled = online.connected && !online.isHost;
+    el.settlementNextBtn.textContent = online.connected && !online.isHost ? "等待房主下一局" : "下一局";
+  }
 }
 
 function normalizeScores() {
@@ -1864,6 +1906,11 @@ el.nextRoundBtn.addEventListener("click", () => {
     }
     startGame();
   }
+});
+
+el.settlementNextBtn?.addEventListener("click", () => {
+  if (online.connected && !online.isHost) return;
+  el.nextRoundBtn.click();
 });
 
 el.startOnlineBtn.addEventListener("click", () => {

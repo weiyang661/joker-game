@@ -9,8 +9,10 @@ if (isMiniProgramView) {
   document.body.dataset.miniapp = "true";
   updateMiniViewportSize();
   window.addEventListener("resize", updateMiniViewportSize);
-  window.visualViewport?.addEventListener("resize", updateMiniViewportSize);
-  window.visualViewport?.addEventListener("scroll", updateMiniViewportSize);
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener("resize", updateMiniViewportSize);
+    window.visualViewport.addEventListener("scroll", updateMiniViewportSize);
+  }
   requestAnimationFrame(updateMiniViewportSize);
   setTimeout(updateMiniViewportSize, 300);
   setTimeout(updateMiniViewportSize, 1000);
@@ -19,13 +21,15 @@ if (isMiniProgramView) {
 function updateMiniViewportSize() {
   if (!isMiniProgramView) return;
   const viewport = window.visualViewport;
-  const width = Math.max(1, Math.round(viewport?.width || window.innerWidth || document.documentElement.clientWidth || screen.width));
-  const height = Math.max(1, Math.round(viewport?.height || window.innerHeight || document.documentElement.clientHeight || screen.height));
+  const width = Math.max(1, Math.round((viewport && viewport.width) || window.innerWidth || document.documentElement.clientWidth || screen.width));
+  const height = Math.max(1, Math.round((viewport && viewport.height) || window.innerHeight || document.documentElement.clientHeight || screen.height));
   document.documentElement.style.setProperty("--mini-vw", `${width}px`);
   document.documentElement.style.setProperty("--mini-vh", `${height}px`);
-  document.body?.style.setProperty("--mini-vw", `${width}px`);
-  document.body?.style.setProperty("--mini-vh", `${height}px`);
-  document.body.dataset.miniReady = "true";
+  if (document.body) {
+    document.body.style.setProperty("--mini-vw", `${width}px`);
+    document.body.style.setProperty("--mini-vh", `${height}px`);
+    document.body.dataset.miniReady = "true";
+  }
 }
 
 const state = {
@@ -184,7 +188,7 @@ function hasYaoHint(hand) {
 }
 
 function playerNameFallback() {
-  return (el.nameInput?.value || "").trim() || "你";
+  return ((el.nameInput && el.nameInput.value) || "").trim() || "你";
 }
 
 function cleanPlayerName(name, fallback = "玩家") {
@@ -845,7 +849,7 @@ function hasAnyHeadRunner() {
 
 function headRunnerTeam() {
   const first = state.players[state.finishedOrder[0]];
-  return first?.team || null;
+  return (first && first.team) || null;
 }
 
 function allPointsAwarded() {
@@ -891,7 +895,7 @@ function chooseSnowChoice(choice) {
   state.snowChasingTeam = winnerTeam;
   state.tableNotice = `${teamName(winnerTeam)}选择雪，继续游戏`;
   addLog(`${teamName(winnerTeam)}选择雪，继续打到最终结果。`);
-  if (state.players[state.current]?.finished) {
+  if ((state.players[state.current] && state.players[state.current].finished)) {
     if (state.currentPlay && !anyActivePlayerCanBeatCurrentPlay()) {
       addLog(`${state.players[state.current].name}已出完，且无人能管最后出的${state.currentPlay.name}，直接交出牌权。`);
       awardTrick();
@@ -944,8 +948,8 @@ function settleRound(winnerTeam, multiplier) {
 }
 
 function settlementBase(player, revealCount) {
-  const bigCount = player.bigCardIds?.size || 0;
-  const playerRevealCount = [...(player.revealedBigs || [])].filter(id => player.bigCardIds?.has(id)).length;
+  const bigCount = (player.bigCardIds && player.bigCardIds.size) || 0;
+  const playerRevealCount = [...(player.revealedBigs || [])].filter(id => (player.bigCardIds && player.bigCardIds.has(id))).length;
   if (revealCount === 0) {
     if (bigCount === 2) return 8;
     return bigCount ? 3 : 2;
@@ -1019,9 +1023,9 @@ function chooseMove(player) {
     .filter(item => item.beat.ok)
     .sort((a, b) => moveCost(a.play) - moveCost(b.play) || a.cards.length - b.cards.length);
   if (!state.currentPlay) {
-    return legal.find(item => item.play.type !== "bomb")?.cards || legal[0]?.cards || [];
+    return ((legal.find(item => item.play.type !== "bomb") || {}).cards || (legal[0] && legal[0].cards) || []);
   }
-  return legal[0]?.cards || [];
+  return (legal[0] && legal[0].cards) || [];
 }
 
 function anyActivePlayerCanBeatCurrentPlay() {
@@ -1094,15 +1098,15 @@ function teamName(team) {
 }
 
 function isBigRevealed(card) {
-  return card?.joker === "big" && revealedBigIds().has(card.id);
+  return (card && card.joker) === "big" && revealedBigIds().has(card.id);
 }
 
 function isBigDecided(card) {
-  return card?.joker === "big" && state.bigRevealDecisions.has(card.id);
+  return (card && card.joker) === "big" && state.bigRevealDecisions.has(card.id);
 }
 
 function cardLabel(card) {
-  if (card?.joker === "big") {
+  if ((card && card.joker) === "big") {
     if (isBigRevealed(card)) return "亮大王";
     if (!state.revealPhase || isBigDecided(card) || state.hasPlayed) return "暗大王";
     return "大王";
@@ -1111,15 +1115,15 @@ function cardLabel(card) {
 }
 
 function cardStateClass(card) {
-  if (card?.joker !== "big") return "";
+  if ((card && card.joker) !== "big") return "";
   if (isBigRevealed(card)) return " brightBig";
   if (!state.revealPhase || isBigDecided(card) || state.hasPlayed) return " darkBig";
   return "";
 }
 
 function jokerKindClass(card) {
-  if (card?.joker === "big") return " bigJoker";
-  if (card?.joker === "small") return " smallJoker";
+  if ((card && card.joker) === "big") return " bigJoker";
+  if ((card && card.joker) === "small") return " smallJoker";
   return "";
 }
 
@@ -1264,7 +1268,7 @@ function sendSocket(message) {
 function renderTableCenter() {
   if (online.connected && online.waitingRoom) {
     const readyLine = humanSeatsInRoom()
-      .map(seat => `${state.players[seat]?.name || `玩家 ${seat}`}：${online.readySeats[seat] ? "已准备" : "未准备"}`)
+      .map(seat => `${(state.players[seat] && state.players[seat].name) || `玩家 ${seat}`}：${online.readySeats[seat] ? "已准备" : "未准备"}`)
       .join("　");
     el.tableCenter.innerHTML = `
       <div class="phasePill">房间准备</div>
@@ -1284,7 +1288,7 @@ function renderTableCenter() {
     : "出牌阶段";
   const current = state.revealPhase || state.gameOver && !state.continuingForNextLead
     ? ""
-    : `<div class="centerLine">轮到：<strong>${player?.name || "无"}</strong></div>`;
+    : `<div class="centerLine">轮到：<strong>${(player && player.name) || "无"}</strong></div>`;
   const settlement = state.roundSettled
     ? `<div class="settlementStrip">${state.lastSettlement.map(item => `<span>${item.name} 总分 ${item.total} 本局 ${formatSigned(item.delta)}</span>`).join("")}</div>`
     : "";
@@ -1294,7 +1298,7 @@ function renderTableCenter() {
   if (isMiniProgramView) {
     const turnText = state.revealPhase || state.gameOver && !state.continuingForNextLead
       ? ""
-      : `轮到：${player?.name || "无"}`;
+      : `轮到：${(player && player.name) || "无"}`;
     const snowText = state.pendingSnowChoice ? `${teamName(state.pendingSnowChoice.winnerTeam)}选择雪局` : "";
     el.tableCenter.innerHTML = `
       <div class="trickScoreBadge">${state.trickPoints}<span>分</span></div>
@@ -1421,7 +1425,7 @@ function allTeamsDetermined() {
 }
 
 function allPublicBigCardsKnown() {
-  return (state.publicBigIds?.size || 0) >= 2;
+  return ((state.publicBigIds && state.publicBigIds.size) || 0) >= 2;
 }
 
 function renderHand() {
@@ -1477,7 +1481,7 @@ function renderHand() {
 
 function canViewTeammateHands() {
   const human = localPlayer();
-  return !!human?.finished && allTeamsDetermined() && !online.waitingRoom;
+  return !!(human && human.finished) && allTeamsDetermined() && !online.waitingRoom;
 }
 
 function teammateHandsHtml(human) {
@@ -1656,14 +1660,14 @@ function renderPanels() {
     .join("");
   const player = state.players[state.current];
   el.statusBox.innerHTML = online.connected && online.waitingRoom
-    ? `房间准备中<br>${humanSeatsInRoom().map(seat => `${state.players[seat]?.name || `玩家 ${seat}`}：${online.readySeats[seat] ? "已准备" : "未准备"}`).join("<br>")}`
+    ? `房间准备中<br>${humanSeatsInRoom().map(seat => `${(state.players[seat] && state.players[seat].name) || `玩家 ${seat}`}：${online.readySeats[seat] ? "已准备" : "未准备"}`).join("<br>")}`
     : state.revealPhase
     ? `亮王阶段<br>已亮大王：${bigRevealCount()} 张`
     : state.continuingForNextLead
     ? `本局已结算，继续找头走<br>轮到：<strong>${player.name}</strong><br>头走将作为下一局先手`
     : state.gameOver && !state.continuingForNextLead
-    ? `本局已结束。<br>下一局先手：${state.players[state.firstFinisherNext]?.name || "未定"}`
-    : `轮到：<strong>${player.name}</strong><br>先手：${state.players[state.leader]?.name || "无"}<br>已亮大王：${bigRevealCount()} 张`;
+    ? `本局已结束。<br>下一局先手：${(state.players[state.firstFinisherNext] && state.players[state.firstFinisherNext].name) || "未定"}`
+    : `轮到：<strong>${player.name}</strong><br>先手：${(state.players[state.leader] && state.players[state.leader].name) || "无"}<br>已亮大王：${bigRevealCount()} 张`;
   el.currentPlay.innerHTML = state.currentPlay
     ? `<strong>${state.players[state.lastPlayer].name}</strong><br>${state.currentPlay.name}<div class="playedCards">${state.currentPlay.cards.map(tinyCard).join("")}</div>`
     : state.revealPhase ? "等待亮王阶段结束。" : "新回合，任意合法牌型都可以出。";
@@ -1680,10 +1684,11 @@ function renderSettlementOverlay() {
   applySettlementOverlayStyle(show);
   if (!show) return;
   const local = localPlayer();
-  const localSettlement = state.lastSettlement.find(item => item.playerId === local?.id);
-  const localDelta = localSettlement?.delta || 0;
+  const localSettlement = state.lastSettlement.find(item => item.playerId === (local && local.id));
+  const localDelta = (localSettlement && localSettlement.delta) || 0;
   const winnerItem = state.lastSettlement.find(item => item.delta > 0);
-  const winnerTeam = state.players[winnerItem?.playerId]?.team || (localDelta >= 0 ? local?.team : opponentTeam(local?.team));
+  const winnerPlayer = state.players[(winnerItem && winnerItem.playerId)];
+  const winnerTeam = (winnerPlayer && winnerPlayer.team) || (localDelta >= 0 ? (local && local.team) : opponentTeam((local && local.team)));
   const localWon = localDelta >= 0;
   if (el.settlementResult) {
     el.settlementResult.textContent = localWon ? "胜利" : "失败";
@@ -1699,12 +1704,12 @@ function renderSettlementOverlay() {
   if (el.settlementRows) {
     el.settlementRows.innerHTML = state.lastSettlement.map(item => {
       const player = state.players[item.playerId];
-      const isSelf = item.playerId === local?.id;
+      const isSelf = item.playerId === (local && local.id);
       const deltaClass = item.delta >= 0 ? "plus" : "minus";
       return `
         <div class="settlementRow ${isSelf ? "self" : ""}">
-          <span><b>${isSelf ? "你" : player?.name || item.name}</b><small>${isSelf ? item.name : "玩家"}</small></span>
-          <span>${teamName(player?.team)}</span>
+          <span><b>${isSelf ? "你" : (player && player.name) || item.name}</b><small>${isSelf ? item.name : "玩家"}</small></span>
+          <span>${teamName((player && player.team))}</span>
           <span class="${deltaClass}">${formatSigned(item.delta)}</span>
           <span>${item.total}</span>
         </div>
@@ -2002,7 +2007,7 @@ el.nextRoundBtn.addEventListener("click", () => {
   }
 });
 
-el.settlementNextBtn?.addEventListener("click", () => {
+el.settlementNextBtn && el.settlementNextBtn.addEventListener("click", () => {
   if (online.connected && !online.isHost) return;
   el.nextRoundBtn.click();
 });
@@ -2117,17 +2122,17 @@ el.inviteBtn.addEventListener("click", async () => {
   }
 });
 
-el.inviteJoinBtn?.addEventListener("click", () => {
+el.inviteJoinBtn && el.inviteJoinBtn.addEventListener("click", () => {
   const roomId = el.roomInput.value.trim().toUpperCase();
-  const name = cleanPlayerName(el.inviteNameInput?.value || el.nameInput.value, "玩家");
+  const name = cleanPlayerName((el.inviteNameInput && el.inviteNameInput.value) || el.nameInput.value, "玩家");
   hideInviteJoinDialog();
   joinRoomFromInputs({ roomId, name });
 });
 
-el.inviteNameInput?.addEventListener("keydown", event => {
+el.inviteNameInput && el.inviteNameInput.addEventListener("keydown", event => {
   if (event.key !== "Enter") return;
   event.preventDefault();
-  el.inviteJoinBtn?.click();
+  el.inviteJoinBtn && el.inviteJoinBtn.click();
 });
 
 function renameSeat(seat, name) {
@@ -2146,7 +2151,7 @@ function inviteUrl(roomId) {
 }
 
 function postMiniProgramRoom(roomId) {
-  if (!roomId || !window.wx?.miniProgram?.postMessage) return;
+  if (!roomId || !(window.wx && window.wx.miniProgram && window.wx.miniProgram.postMessage)) return;
   window.wx.miniProgram.postMessage({
     data: {
       roomId,
@@ -2356,13 +2361,13 @@ function updateOnlineStatus(extra = "") {
   if (online.isHost) {
     const phase = online.waitingRoom ? "等待开始" : "游戏中";
     const seats = Object.keys(online.seatClients).sort()
-      .map(seat => `${seat}号 ${state.players[seat]?.name || `玩家 ${seat}`} ${online.waitingRoom ? (online.readySeats[seat] ? "已准备" : "未准备") : ""}`.trim())
+      .map(seat => `${seat}号 ${(state.players[seat] && state.players[seat].name) || `玩家 ${seat}`} ${online.waitingRoom ? (online.readySeats[seat] ? "已准备" : "未准备") : ""}`.trim())
       .join("、") || "暂无真人加入";
     const hostReady = online.waitingRoom ? ` · 房主${online.readySeats[0] ? "已准备" : "未准备"}` : "";
-    el.onlineStatus.textContent = `房号 ${online.roomId || "生成中"} · ${phase}${hostReady} · ${state.players[0]?.name || "房主"}是房主 · ${seats}`;
+    el.onlineStatus.textContent = `房号 ${online.roomId || "生成中"} · ${phase}${hostReady} · ${(state.players[0] && state.players[0].name) || "房主"}是房主 · ${seats}`;
   } else {
     const readyText = online.waitingRoom ? ` · ${online.readySeats[online.seat] ? "已准备" : "未准备"}` : "";
-    el.onlineStatus.textContent = extra || `房号 ${online.roomId} · ${state.players[online.seat]?.name || "你"}在座位 ${online.seat}${readyText}`;
+    el.onlineStatus.textContent = extra || `房号 ${online.roomId} · ${(state.players[online.seat] && state.players[online.seat].name) || "你"}在座位 ${online.seat}${readyText}`;
   }
 }
 

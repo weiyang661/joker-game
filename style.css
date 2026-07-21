@@ -1285,6 +1285,10 @@ body[data-settlement="true"] .settlementOverlay {
     radial-gradient(circle at 50% 36%, #5b6675 0 18%, transparent 19%);
   border: 2px solid rgba(255,255,255,.55);
   box-shadow: 0 6px 16px rgba(0,0,0,.28);
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-color: rgba(236, 244, 248, .92);
 }
 
 .seat0 .seatAvatar { background: linear-gradient(135deg, #edf3fb, #b7c8d5); }

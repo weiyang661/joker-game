@@ -920,6 +920,9 @@ function endRound(message, winnerTeam = null, multiplier = 1) {
     state.continuingForNextLead = true;
     addLog("本局还没有头跑，继续打到有人出完，以确定下一局先手。");
   }
+  if (state.roundSettled && !state.continuingForNextLead) {
+    setTimeout(render, 0);
+  }
 }
 
 function settleRound(winnerTeam, multiplier) {

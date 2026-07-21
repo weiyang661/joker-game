@@ -1170,6 +1170,37 @@ function render() {
 }
 
 function ensureSettlementOverlayInBody() {
+  if (!el.settlementOverlay) {
+    el.settlementOverlay = document.createElement("section");
+    el.settlementOverlay.id = "settlementOverlay";
+    el.settlementOverlay.className = "settlementOverlay";
+    el.settlementOverlay.setAttribute("aria-live", "polite");
+    el.settlementOverlay.innerHTML = `
+      <div class="settlementPanel">
+        <div class="settlementResult" id="settlementResult">胜利</div>
+        <div class="settlementBoard">
+          <div class="settlementTitle" id="settlementTitle">本局结算</div>
+          <div class="settlementHead">
+            <span>玩家</span>
+            <span>阵营</span>
+            <span>本局</span>
+            <span>总分</span>
+          </div>
+          <div id="settlementRows" class="settlementRows"></div>
+        </div>
+        <button id="settlementNextBtn" class="settlementNextBtn">下一局</button>
+      </div>
+    `;
+    document.body.appendChild(el.settlementOverlay);
+    el.settlementResult = el.settlementOverlay.querySelector("#settlementResult");
+    el.settlementTitle = el.settlementOverlay.querySelector("#settlementTitle");
+    el.settlementRows = el.settlementOverlay.querySelector("#settlementRows");
+    el.settlementNextBtn = el.settlementOverlay.querySelector("#settlementNextBtn");
+    el.settlementNextBtn.addEventListener("click", () => {
+      if (online.connected && !online.isHost) return;
+      el.nextRoundBtn.click();
+    });
+  }
   if (el.settlementOverlay && el.settlementOverlay.parentElement !== document.body) {
     document.body.appendChild(el.settlementOverlay);
   }
@@ -1744,7 +1775,7 @@ function ensureSettlementDataForDisplay() {
   state.roundSettled = true;
   state.lastSettlement = state.players.map(player => {
     const delta = player.roundDelta || 0;
-    const total = player.matchScore ?? state.playerMatch[player.id] ?? 0;
+    const total = player.matchScore != null ? player.matchScore : (state.playerMatch[player.id] != null ? state.playerMatch[player.id] : 0);
     return { playerId: player.id, name: player.name, delta, total, base: 0 };
   });
 }
@@ -2080,7 +2111,7 @@ async function joinRoomFromInputs(options = {}) {
   const requestedSeat = Number(options.seat || el.seatSelect.value);
   online.seat = requestedSeat;
   online.roomId = roomId;
-  const name = cleanPlayerName(options.name ?? el.nameInput.value, `玩家 ${requestedSeat}`);
+  const name = cleanPlayerName(options.name != null ? options.name : el.nameInput.value, `玩家 ${requestedSeat}`);
   el.roomInput.value = roomId;
   el.nameInput.value = name;
   rememberPlayerName(name);

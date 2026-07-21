@@ -1155,6 +1155,7 @@ function addLog(text) {
 }
 
 function render() {
+  ensureSettlementOverlayInBody();
   updateActionVisibility();
   renderTable();
   renderTablePlayLayer();
@@ -1162,6 +1163,12 @@ function render() {
   renderPanels();
   renderSettlementOverlay();
   broadcastSnapshot();
+}
+
+function ensureSettlementOverlayInBody() {
+  if (el.settlementOverlay && el.settlementOverlay.parentElement !== document.body) {
+    document.body.appendChild(el.settlementOverlay);
+  }
 }
 
 function updateActionVisibility() {
@@ -1666,7 +1673,8 @@ function renderPanels() {
 
 function renderSettlementOverlay() {
   if (!el.settlementOverlay) return;
-  const show = state.roundSettled && !state.continuingForNextLead && state.lastSettlement.length > 0;
+  ensureSettlementDataForDisplay();
+  const show = shouldShowSettlementOverlay();
   document.body.dataset.settlement = show ? "true" : "false";
   el.settlementOverlay.classList.toggle("show", show);
   el.settlementOverlay.style.display = show ? "flex" : "";
@@ -1712,6 +1720,27 @@ function renderSettlementOverlay() {
       ? "等待房主下一局"
       : "下一局";
   }
+}
+
+function shouldShowSettlementOverlay() {
+  if (state.roundSettled && state.lastSettlement.length > 0) return true;
+  if (!state.gameOver) return false;
+  return isFinalSettlementNotice(state.tableNotice);
+}
+
+function isFinalSettlementNotice(notice) {
+  return /获胜|结算|小雪|大雪|无雪|免雪/.test(String(notice || ""));
+}
+
+function ensureSettlementDataForDisplay() {
+  if (state.lastSettlement.length > 0) return;
+  if (!state.roundSettled && (!state.gameOver || !isFinalSettlementNotice(state.tableNotice))) return;
+  state.roundSettled = true;
+  state.lastSettlement = state.players.map(player => {
+    const delta = player.roundDelta || 0;
+    const total = player.matchScore ?? state.playerMatch[player.id] ?? 0;
+    return { playerId: player.id, name: player.name, delta, total, base: 0 };
+  });
 }
 
 function normalizeScores() {

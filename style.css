@@ -1043,19 +1043,19 @@ body[data-invite-join="true"] .inviteJoinDialog {
 }
 .tableCard em {
   position: absolute;
-  right: 5px;
-  bottom: 24px;
-  width: 18px;
-  height: 18px;
+  right: 4px;
+  bottom: 5px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
   background: radial-gradient(circle at 34% 24%, #ffe093, #d58a1f 72%);
   color: white;
   border: 1px solid rgba(255,255,255,.62);
-  font: 900 12px/18px "Microsoft YaHei", sans-serif;
+  font: 900 10px/16px "Microsoft YaHei", sans-serif;
   text-align: center;
   text-shadow: 0 1px 1px rgba(0,0,0,.36);
   box-shadow: 0 2px 4px rgba(0,0,0,.28);
-  z-index: 2;
+  z-index: 3;
 }
 
 .settlementStrip {
@@ -1103,11 +1103,17 @@ body[data-invite-join="true"] .inviteJoinDialog {
 }
 
 body[data-settlement="true"] .settlementOverlay {
-  display: flex;
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
 }
 
 .settlementOverlay.show {
   display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
 }
 
 .settlementPanel {
@@ -1979,7 +1985,9 @@ body[data-miniapp="true"] .trickScoreBadge {
 }
 
 body[data-miniapp="true"] .settlementOverlay {
-  z-index: 10000;
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 2147483000;
   align-items: center;
   justify-content: center;
   padding: 0;
@@ -2228,6 +2236,19 @@ body[data-miniapp="true"] .tablePlaySlot .tableCard {
   width: 36px;
   height: 53px;
   margin-left: -9px;
+}
+
+body[data-miniapp="true"] .tablePlaySlot .tableCard em,
+body[data-miniapp="true"] .centerPlay .tableCard em,
+body[data-miniapp="true"] .tablePlayedCards .tableCard em {
+  right: 2px;
+  bottom: 3px;
+  width: 12px;
+  height: 12px;
+  font-size: 8px;
+  line-height: 12px;
+  border-width: 1px;
+  box-shadow: 0 1px 2px rgba(0,0,0,.24);
 }
 
 body[data-miniapp="true"] .tablePlayTitle,

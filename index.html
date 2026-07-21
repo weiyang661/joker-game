@@ -106,8 +106,26 @@
         <button id="inviteJoinBtn" class="primary">进入房间</button>
       </div>
     </section>
+
+    <section id="settlementOverlay" class="settlementOverlay" aria-live="polite">
+      <div class="settlementPanel">
+        <div class="settlementResult" id="settlementResult">胜利</div>
+        <div class="settlementBoard">
+          <div class="settlementTitle" id="settlementTitle">本局结算</div>
+          <div class="settlementHead">
+            <span>玩家</span>
+            <span>阵营</span>
+            <span>本局</span>
+            <span>总分</span>
+          </div>
+          <div id="settlementRows" class="settlementRows"></div>
+        </div>
+        <button id="settlementNextBtn" class="settlementNextBtn">下一局</button>
+      </div>
+    </section>
   </main>
 
+  <script src="https://res.wx.qq.com/open/js/jweixin-1.6.0.js"></script>
   <script src="./game.js"></script>
 </body>
 </html>

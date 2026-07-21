@@ -1677,7 +1677,7 @@ function renderSettlementOverlay() {
   const show = shouldShowSettlementOverlay();
   document.body.dataset.settlement = show ? "true" : "false";
   el.settlementOverlay.classList.toggle("show", show);
-  el.settlementOverlay.style.display = show ? "flex" : "";
+  applySettlementOverlayStyle(show);
   if (!show) return;
   const local = localPlayer();
   const localSettlement = state.lastSettlement.find(item => item.playerId === local?.id);
@@ -1723,8 +1723,8 @@ function renderSettlementOverlay() {
 }
 
 function shouldShowSettlementOverlay() {
-  if (state.roundSettled && state.lastSettlement.length > 0) return true;
-  if (!state.gameOver) return false;
+  if (online.waitingRoom || state.pendingSnowChoice) return false;
+  if (state.roundSettled || state.lastSettlement.length > 0) return true;
   return isFinalSettlementNotice(state.tableNotice);
 }
 
@@ -1734,12 +1734,31 @@ function isFinalSettlementNotice(notice) {
 
 function ensureSettlementDataForDisplay() {
   if (state.lastSettlement.length > 0) return;
-  if (!state.roundSettled && (!state.gameOver || !isFinalSettlementNotice(state.tableNotice))) return;
+  if (state.pendingSnowChoice) return;
+  if (!state.roundSettled && !isFinalSettlementNotice(state.tableNotice)) return;
   state.roundSettled = true;
   state.lastSettlement = state.players.map(player => {
     const delta = player.roundDelta || 0;
     const total = player.matchScore ?? state.playerMatch[player.id] ?? 0;
     return { playerId: player.id, name: player.name, delta, total, base: 0 };
+  });
+}
+
+function applySettlementOverlayStyle(show) {
+  if (!el.settlementOverlay) return;
+  Object.assign(el.settlementOverlay.style, show ? {
+    display: "flex",
+    position: "fixed",
+    inset: "0",
+    zIndex: "2147483000",
+    visibility: "visible",
+    opacity: "1",
+    pointerEvents: "auto"
+  } : {
+    display: "",
+    visibility: "",
+    opacity: "",
+    pointerEvents: ""
   });
 }
 

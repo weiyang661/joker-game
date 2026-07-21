@@ -504,6 +504,42 @@ body[data-invite-join="true"] .inviteJoinDialog {
   min-height: 0;
 }
 
+.tableScoreStrip {
+  position: absolute;
+  left: 24px;
+  top: 18px;
+  z-index: 24;
+  display: inline-flex;
+  align-items: center;
+  overflow: hidden;
+  border-radius: 9px;
+  background: rgba(18, 24, 32, .72);
+  box-shadow: 0 8px 18px rgba(0,0,0,.24), inset 0 1px 0 rgba(255,255,255,.1);
+  backdrop-filter: blur(4px);
+}
+
+.tableScoreStrip span {
+  min-width: 92px;
+  padding: 7px 12px;
+  color: #dce5ef;
+  font-size: 15px;
+  font-weight: 900;
+  text-align: center;
+  border-right: 1px solid rgba(255,255,255,.12);
+}
+
+.tableScoreStrip span:last-child {
+  border-right: 0;
+}
+
+.tableScoreStrip b {
+  display: block;
+  margin-top: 2px;
+  color: #ffe793;
+  font-size: 22px;
+  line-height: 1;
+}
+
 .tableCenter {
   position: absolute;
   left: 50%;
@@ -1837,7 +1873,7 @@ body[data-miniapp="true"] .tableWrap {
   left: 4px;
   right: 4px;
   top: 4px;
-  bottom: 104px;
+  bottom: 92px;
   z-index: 4;
   height: auto;
   min-height: 0;
@@ -1968,8 +2004,8 @@ body[data-miniapp="true"] .seatAvatar {
 }
 
 body[data-miniapp="true"] .seat0 {
-  left: 50% !important;
-  top: 83% !important;
+  left: 8% !important;
+  top: 85% !important;
 }
 
 body[data-miniapp="true"] .seat1 {
@@ -2070,6 +2106,35 @@ body[data-miniapp="true"] .slot4 {
 body[data-miniapp="true"] .tablePlayCards {
   max-width: 220px;
   min-height: 52px;
+  margin-top: 0;
+}
+
+body[data-miniapp="true"] .tablePlayTitle {
+  display: none;
+}
+
+body[data-miniapp="true"] .tableScoreStrip {
+  left: 10px;
+  top: 8px;
+  border-radius: 6px;
+}
+
+body[data-miniapp="true"] .tableScoreStrip span {
+  min-width: 58px;
+  padding: 3px 7px;
+  font-size: 10px;
+}
+
+body[data-miniapp="true"] .tableScoreStrip b {
+  font-size: 14px;
+}
+
+body[data-miniapp="true"] .seat0 .seatTopInfo {
+  margin-bottom: 2px;
+}
+
+body[data-miniapp="true"] .seat0 .cardCountBadge {
+  right: 8px;
 }
 
 body[data-miniapp="true"] .tablePlaySlot .tableCard {
@@ -2090,55 +2155,63 @@ body[data-miniapp="true"] .handPanel {
   right: 4px;
   bottom: 2px;
   z-index: 32;
-  height: 100px;
-  padding: 0 8px 5px;
+  height: 84px;
+  padding: 5px 8px 5px;
   border-radius: 9px;
 }
 
 body[data-miniapp="true"] .handHeader {
-  min-height: 30px;
-  height: 30px;
-  padding: 4px 6px;
-  flex-direction: row;
+  position: fixed;
+  left: 20%;
+  right: 20%;
+  bottom: 90px;
+  z-index: 42;
+  min-height: 0;
+  height: 40px;
+  padding: 0;
+  display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: center;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  pointer-events: none;
 }
 
-body[data-miniapp="true"] .handHeader h2 {
-  font-size: 14px;
-  margin-right: 8px;
+body[data-miniapp="true"] .handHeader > div:first-child {
+  display: none;
 }
 
 body[data-miniapp="true"] #selectionInfo {
-  max-width: 36vw;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 12px;
+  display: none;
 }
 
 body[data-miniapp="true"] .handActions {
-  margin-left: auto;
+  width: 100%;
+  margin: 0;
   flex-wrap: nowrap;
-  gap: 6px;
+  justify-content: center;
+  gap: 9px;
+  pointer-events: auto;
 }
 
 body[data-miniapp="true"] .handActions button {
-  min-width: 54px;
-  min-height: 26px;
-  padding: 3px 7px;
-  font-size: 13px;
+  min-width: 86px;
+  min-height: 38px;
+  padding: 5px 12px;
+  font-size: 17px;
+  border-radius: 8px;
 }
 
 body[data-miniapp="true"] #playBtn {
-  min-width: 78px;
-  min-height: 28px;
-  font-size: 14px;
+  min-width: 108px;
+  min-height: 40px;
+  font-size: 18px;
 }
 
 body[data-miniapp="true"] .hand {
-  height: 72px;
-  padding: 5px 8px 3px;
+  height: 74px;
+  padding: 1px 8px 3px;
   overflow: hidden;
   scrollbar-width: none;
 }

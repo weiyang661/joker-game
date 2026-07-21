@@ -1317,7 +1317,7 @@ function renderTablePlayLayer() {
     const content = !play
       ? ""
       : play.cards.length
-      ? `<div class="tablePlayTitle">${player.name} · ${play.name}</div><div class="tablePlayCards">${play.cards.map(tableCard).join("")}</div>`
+      ? `${isMiniProgramView ? "" : `<div class="tablePlayTitle">${player.name} · ${play.name}</div>`}<div class="tablePlayCards">${play.cards.map(tableCard).join("")}</div>`
       : `<div class="tablePlayPass">${player.name} · 过</div>`;
     return `<div class="tablePlaySlot slot${slotIndex}" style="left:${slots[slotIndex][0]};top:${slots[slotIndex][1]}">${content}</div>`;
   }).join("");
@@ -1367,9 +1367,21 @@ function renderTable() {
       ${handPreview}
     </article>`;
   }).join("");
-  el.table.innerHTML = `${seats}<div class="tableCenter" id="tableCenter"></div>`;
+  el.table.innerHTML = `${tableTeamScoreMarkup()}${seats}<div class="tableCenter" id="tableCenter"></div>`;
   el.tableCenter = document.querySelector("#tableCenter");
   renderTableCenter();
+}
+
+function tableTeamScoreMarkup() {
+  const revealScores = state.roundSettled || (state.gameOver && !state.continuingForNextLead) || allTeamsDetermined();
+  const king = revealScores ? state.scores.king : "未知";
+  const plain = revealScores ? state.scores.plain : "未知";
+  return `
+    <div class="tableScoreStrip">
+      <span>王队 <b>${king}</b></span>
+      <span>平民 <b>${plain}</b></span>
+    </div>
+  `;
 }
 
 function shouldRevealHands() {

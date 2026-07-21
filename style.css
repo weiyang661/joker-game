@@ -1096,8 +1096,10 @@ body[data-invite-join="true"] .inviteJoinDialog {
   align-items: center;
   justify-content: center;
   padding: clamp(16px, 3vw, 48px);
-  background: rgba(2, 12, 14, .52);
-  backdrop-filter: blur(2px);
+  background:
+    radial-gradient(circle at 72% 12%, rgba(255, 225, 150, .18), transparent 28%),
+    rgba(2, 12, 14, .70);
+  backdrop-filter: blur(3px);
 }
 
 body[data-settlement="true"] .settlementOverlay {
@@ -1110,26 +1112,38 @@ body[data-settlement="true"] .settlementOverlay {
 
 .settlementPanel {
   position: relative;
-  width: min(1180px, 92vw);
-  min-height: min(520px, 78vh);
+  width: min(1260px, 94vw);
+  min-height: min(560px, 80vh);
   display: grid;
-  grid-template-columns: minmax(250px, .9fr) minmax(520px, 1.8fr);
+  grid-template-columns: minmax(300px, .92fr) minmax(600px, 1.85fr);
   align-items: stretch;
   overflow: hidden;
-  border-radius: 10px;
+  border-radius: 12px;
   box-shadow: 0 28px 90px rgba(0, 0, 0, .48);
-  background: linear-gradient(100deg, rgba(34, 184, 222, .94) 0 31%, rgba(247, 251, 246, .97) 31% 100%);
+  background: linear-gradient(102deg, rgba(38, 176, 220, .98) 0 33%, rgba(250, 255, 251, .98) 33% 100%);
 }
 
 .settlementResult {
+  position: relative;
   display: grid;
   place-items: center;
-  padding: 34px;
+  padding: 34px 28px;
   color: #eef9ff;
-  font-size: clamp(54px, 8vw, 120px);
+  font-size: clamp(64px, 8.6vw, 132px);
   font-weight: 900;
   letter-spacing: .08em;
   text-shadow: 0 6px 12px rgba(28, 80, 150, .42);
+  isolation: isolate;
+}
+
+.settlementResult::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(120deg, rgba(255,255,255,.22), transparent 42%),
+    radial-gradient(circle at 44% 48%, rgba(255,255,255,.18), transparent 42%);
+  z-index: -1;
 }
 
 .settlementResult[data-result="lose"] {
@@ -1139,10 +1153,12 @@ body[data-settlement="true"] .settlementOverlay {
 .settlementResult::after {
   content: "WIN";
   position: absolute;
-  left: 7.8%;
-  top: 57%;
+  left: 50%;
+  top: 63%;
+  transform: translateX(-50%);
   color: rgba(255, 255, 255, .92);
-  font-size: clamp(18px, 2.8vw, 38px);
+  font-size: clamp(22px, 3vw, 42px);
+  font-weight: 900;
   letter-spacing: .08em;
 }
 
@@ -1151,12 +1167,15 @@ body[data-settlement="true"] .settlementOverlay {
 }
 
 .settlementBoard {
-  padding: 28px 42px 94px;
+  padding: 30px 48px 104px;
   color: #26333c;
+  background:
+    linear-gradient(90deg, rgba(255,255,255,.96), rgba(245, 252, 255, .98)),
+    radial-gradient(circle at 100% 100%, rgba(125, 214, 236, .18), transparent 34%);
 }
 
 .settlementTitle {
-  margin-bottom: 18px;
+  margin-bottom: 20px;
   color: #43515b;
   font-size: clamp(18px, 2vw, 28px);
   font-weight: 900;
@@ -1166,26 +1185,27 @@ body[data-settlement="true"] .settlementOverlay {
 .settlementHead,
 .settlementRow {
   display: grid;
-  grid-template-columns: 1.6fr .8fr .7fr .7fr;
+  grid-template-columns: 1.55fr .75fr .82fr .72fr;
   align-items: center;
   gap: 14px;
 }
 
 .settlementHead {
-  padding: 0 18px 10px;
+  padding: 0 18px 12px;
   color: #8d8a82;
   font-size: 18px;
   font-weight: 900;
+  border-bottom: 2px solid rgba(45, 82, 96, .12);
 }
 
 .settlementRows {
   display: grid;
-  gap: 2px;
+  gap: 0;
 }
 
 .settlementRow {
-  min-height: 72px;
-  padding: 8px 18px;
+  min-height: 76px;
+  padding: 9px 18px;
   border-bottom: 1px solid rgba(42, 77, 92, .12);
   font-size: clamp(18px, 2.1vw, 30px);
   font-weight: 800;
@@ -1221,10 +1241,10 @@ body[data-settlement="true"] .settlementOverlay {
 
 .settlementNextBtn {
   position: absolute;
-  right: 42px;
-  bottom: 26px;
-  min-width: 210px;
-  min-height: 58px;
+  right: 48px;
+  bottom: 28px;
+  min-width: 230px;
+  min-height: 64px;
   border: 0;
   border-radius: 8px;
   background: linear-gradient(#35d67b, #08a956);
@@ -1963,46 +1983,61 @@ body[data-miniapp="true"] .settlementOverlay {
   align-items: center;
   justify-content: center;
   padding: 0;
-  background: rgba(2, 15, 18, .64);
+  background:
+    linear-gradient(rgba(0, 18, 18, .44), rgba(0, 18, 18, .64)),
+    rgba(2, 15, 18, .72);
   backdrop-filter: blur(2px);
 }
 
 body[data-miniapp="true"] .settlementPanel {
-  width: min(980px, calc(var(--mini-vw, 100vw) - 26px));
-  height: min(330px, calc(var(--mini-vh, 100vh) - 18px));
+  width: calc(var(--mini-vw, 100vw) - 18px);
+  height: calc(var(--mini-vh, 100vh) - 18px);
+  max-width: 1180px;
+  max-height: 430px;
   min-height: 0;
-  grid-template-columns: minmax(168px, .72fr) minmax(430px, 1.75fr);
+  grid-template-columns: minmax(230px, .78fr) minmax(560px, 1.9fr);
   border-radius: 8px;
   box-shadow: 0 20px 70px rgba(0, 0, 0, .55);
-  background: linear-gradient(103deg, rgba(42, 178, 218, .96) 0 32%, rgba(252, 255, 248, .98) 32% 100%);
+  background: linear-gradient(103deg, rgba(42, 178, 218, .98) 0 32%, rgba(252, 255, 248, .99) 32% 100%);
 }
 
 body[data-miniapp="true"] .settlementResult {
-  padding: 16px;
-  font-size: clamp(46px, 16vh, 86px);
+  padding: 12px 16px;
+  font-size: clamp(54px, 19vh, 104px);
   letter-spacing: .05em;
 }
 
+body[data-miniapp="true"] .settlementResult::after {
+  top: 64%;
+  font-size: clamp(18px, 6vh, 34px);
+}
+
 body[data-miniapp="true"] .settlementBoard {
-  padding: 12px 26px 58px;
+  padding: 14px 30px 70px;
   overflow: hidden;
 }
 
 body[data-miniapp="true"] .settlementTitle {
-  margin-bottom: 6px;
-  font-size: clamp(15px, 4.2vh, 22px);
+  margin-bottom: 8px;
+  font-size: clamp(16px, 4.6vh, 24px);
   text-align: right;
 }
 
+body[data-miniapp="true"] .settlementHead,
+body[data-miniapp="true"] .settlementRow {
+  grid-template-columns: 1.45fr .7fr .78fr .72fr;
+  gap: 10px;
+}
+
 body[data-miniapp="true"] .settlementHead {
-  padding: 0 12px 4px;
-  font-size: clamp(11px, 2.5vh, 14px);
+  padding: 0 12px 5px;
+  font-size: clamp(12px, 3vh, 15px);
 }
 
 body[data-miniapp="true"] .settlementRow {
-  min-height: clamp(38px, 9.5vh, 50px);
-  padding: 3px 12px;
-  font-size: clamp(14px, 4.1vh, 22px);
+  min-height: clamp(42px, 10.5vh, 56px);
+  padding: 4px 12px;
+  font-size: clamp(16px, 4.9vh, 24px);
 }
 
 body[data-miniapp="true"] .settlementRow small {
@@ -2010,12 +2045,12 @@ body[data-miniapp="true"] .settlementRow small {
 }
 
 body[data-miniapp="true"] .settlementNextBtn {
-  right: 26px;
-  bottom: 12px;
-  min-width: clamp(128px, 20vw, 190px);
-  min-height: clamp(40px, 8.5vh, 52px);
+  right: 30px;
+  bottom: 14px;
+  min-width: clamp(150px, 23vw, 230px);
+  min-height: clamp(44px, 9.8vh, 58px);
   border-radius: 7px;
-  font-size: clamp(18px, 4.6vh, 26px);
+  font-size: clamp(20px, 5.3vh, 30px);
 }
 
 body[data-miniapp="true"] .seat {
@@ -2108,6 +2143,12 @@ body[data-miniapp="true"] .tablePlaySlot {
 body[data-miniapp="true"] .slot0 {
   left: 50% !important;
   top: 35% !important;
+}
+
+body[data-miniapp="true"][data-action-visible="false"] .slot0 {
+  left: 50% !important;
+  top: 67% !important;
+  transform: translate(-50%, -50%) scale(.86);
 }
 
 body[data-miniapp="true"] .slot1 {
@@ -2226,6 +2267,10 @@ body[data-miniapp="true"] .handHeader {
   border: 0;
   box-shadow: none;
   pointer-events: none;
+}
+
+body[data-miniapp="true"][data-action-visible="false"] .handHeader {
+  display: none;
 }
 
 body[data-miniapp="true"] .handHeader > div:first-child {

@@ -1155,12 +1155,19 @@ function addLog(text) {
 }
 
 function render() {
+  updateActionVisibility();
   renderTable();
   renderTablePlayLayer();
   renderHand();
   renderPanels();
   renderSettlementOverlay();
   broadcastSnapshot();
+}
+
+function updateActionVisibility() {
+  const human = localPlayer();
+  const actionMode = currentActionMode();
+  document.body.dataset.actionVisible = shouldShowActionButtons(actionMode, human) ? "true" : "false";
 }
 
 function applyMenuLayout() {
@@ -1486,6 +1493,7 @@ function teammateHandsHtml(human) {
 
 function renderSelection() {
   if (online.connected && online.waitingRoom) {
+    document.body.dataset.actionVisible = "false";
     el.selectionInfo.textContent = "房间准备中，开始本局后才会发牌。";
     el.playBtn.textContent = "出牌";
     el.passBtn.textContent = "过";
@@ -1500,6 +1508,7 @@ function renderSelection() {
   }
   const human = localPlayer();
   const actionMode = currentActionMode();
+  document.body.dataset.actionVisible = shouldShowActionButtons(actionMode, human) ? "true" : "false";
   renderActionButtons(actionMode);
   if (actionMode.type === "reveal") {
     el.selectionInfo.textContent = actionMode.count >= 2 ? "请选择亮王数量。" : "请选择亮或不亮大王。";
@@ -1551,6 +1560,16 @@ function currentActionMode() {
     return { type: "snow" };
   }
   return { type: "play" };
+}
+
+function shouldShowActionButtons(mode, human) {
+  if (!human || online.waitingRoom) return false;
+  if (mode.type === "reveal" || mode.type === "snow") return true;
+  if (human.finished) return canViewTeammateHands();
+  return !state.pendingSnowChoice
+    && !state.revealPhase
+    && state.current === localSeat()
+    && (!state.gameOver || state.continuingForNextLead);
 }
 
 function renderActionButtons(mode) {
@@ -1647,7 +1666,7 @@ function renderPanels() {
 
 function renderSettlementOverlay() {
   if (!el.settlementOverlay) return;
-  const show = state.roundSettled && state.gameOver && state.lastSettlement.length > 0;
+  const show = state.roundSettled && !state.continuingForNextLead && state.lastSettlement.length > 0;
   document.body.dataset.settlement = show ? "true" : "false";
   el.settlementOverlay.classList.toggle("show", show);
   el.settlementOverlay.style.display = show ? "flex" : "";
@@ -1665,6 +1684,10 @@ function renderSettlementOverlay() {
   if (el.settlementTitle) {
     el.settlementTitle.textContent = state.tableNotice || `${teamName(winnerTeam)}获胜 · 本局结算`;
   }
+  const settlementHead = el.settlementOverlay.querySelector(".settlementHead");
+  if (settlementHead) {
+    settlementHead.innerHTML = "<span>昵称</span><span>阵营</span><span>本局得失</span><span>总分</span>";
+  }
   if (el.settlementRows) {
     el.settlementRows.innerHTML = state.lastSettlement.map(item => {
       const player = state.players[item.playerId];
@@ -1672,7 +1695,7 @@ function renderSettlementOverlay() {
       const deltaClass = item.delta >= 0 ? "plus" : "minus";
       return `
         <div class="settlementRow ${isSelf ? "self" : ""}">
-          <span><b>${isSelf ? "你" : player?.name || item.name}</b><small>${item.name}</small></span>
+          <span><b>${isSelf ? "你" : player?.name || item.name}</b><small>${isSelf ? item.name : "玩家"}</small></span>
           <span>${teamName(player?.team)}</span>
           <span class="${deltaClass}">${formatSigned(item.delta)}</span>
           <span>${item.total}</span>

@@ -2291,36 +2291,50 @@ body[data-miniapp="true"] .tablePlayTitle {
 }
 
 body[data-miniapp="true"] .tableScoreStrip {
-  left: clamp(180px, 18vw, 310px);
+  left: 22px;
+  right: 22px;
   top: 14px;
   border-radius: 8px;
-  background: rgba(6, 27, 27, .42);
-  border: 1px solid rgba(255, 234, 160, .24);
+  background: transparent;
+  border: 0;
   box-shadow: none;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 0;
+  pointer-events: none;
 }
 
 body[data-miniapp="true"] .tableScoreStrip span {
-  min-width: 58px;
-  padding: 3px 7px;
-  font-size: 10px;
+  display: block;
+  min-width: 74px;
+  padding: 5px 10px;
+  font-size: 13px;
+  line-height: 1.1;
+  background: rgba(6, 27, 27, .58);
+  border-right: 1px solid rgba(255, 255, 255, .12);
 }
 
 body[data-miniapp="true"] .tableScoreStrip b {
-  font-size: 14px;
+  font-size: 22px;
 }
 
 body[data-miniapp="true"] .tableScoreStrip span:not(.roomCodeLabel) {
-  display: none;
+  display: block;
 }
 
 body[data-miniapp="true"] .tableScoreStrip .roomCodeLabel {
-  display: block;
+  position: absolute;
+  left: clamp(210px, 23vw, 420px);
+  top: 0;
   min-width: clamp(190px, 24vw, 300px);
   padding: 6px 14px;
+  background: rgba(6, 27, 27, .52);
+  border: 1px solid rgba(255, 234, 160, .24);
+  border-radius: 8px;
   color: rgba(255, 250, 220, .82);
   text-align: left;
   font-size: clamp(12px, 2.5vh, 16px);
-  border-right: 0;
   letter-spacing: .02em;
 }
 

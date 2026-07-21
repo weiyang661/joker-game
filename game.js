@@ -1490,8 +1490,12 @@ function tableTeamScoreMarkup() {
   const revealScores = state.roundSettled || (state.gameOver && !state.continuingForNextLead) || allTeamsDetermined();
   const king = revealScores ? state.scores.king : "未知";
   const plain = revealScores ? state.scores.plain : "未知";
+  const room = online.connected && online.roomId
+    ? `<span class="roomCodeLabel">房号 <b>${online.roomId}</b></span>`
+    : "";
   return `
     <div class="tableScoreStrip">
+      ${room}
       <span>王队 <b>${king}</b></span>
       <span>平民 <b>${plain}</b></span>
     </div>
@@ -2273,9 +2277,26 @@ function postMiniProgramRoom(roomId) {
   window.wx.miniProgram.postMessage({
     data: {
       roomId,
+      action: "room",
       title: `五人牌局 房间 ${roomId}`
     }
   });
+}
+
+function postMiniProgramShare(roomId) {
+  if (!roomId || !(window.wx && window.wx.miniProgram)) return;
+  if (window.wx.miniProgram.postMessage) window.wx.miniProgram.postMessage({
+    data: {
+      roomId,
+      action: "share",
+      title: `五人牌局 房间 ${roomId}，点击立即加入`
+    }
+  });
+  if (window.wx.miniProgram.navigateTo) {
+    window.wx.miniProgram.navigateTo({
+      url: `/pages/share/share?room=${encodeURIComponent(roomId)}`
+    });
+  }
 }
 
 function showSeatChoice(seat) {
@@ -2312,8 +2333,9 @@ function requestSeatInvite(seat) {
   const url = inviteUrl(online.roomId);
   postMiniProgramRoom(online.roomId);
   if (isMiniProgramView) {
-    state.tableNotice = `已准备好房间 ${online.roomId} 的邀请，请点右上角分享给微信好友`;
-    updateOnlineStatus(`邀请座位 ${seat}：请点右上角分享，好友打开后会直接进入房间`);
+    postMiniProgramShare(online.roomId);
+    state.tableNotice = `已准备好房间 ${online.roomId} 的邀请，请点击牌桌上方“邀请好友”`;
+    updateOnlineStatus(`邀请座位 ${seat}：点击小程序上方邀请好友，好友打开后会直接进入房间`);
     render();
     return;
   }

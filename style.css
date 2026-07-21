@@ -1958,6 +1958,11 @@ body[data-miniapp="true"] .topbar {
   max-width: 118px;
 }
 
+body[data-miniapp="true"] .topbar,
+body[data-miniapp="true"] .scoreboard {
+  display: none !important;
+}
+
 body[data-miniapp="true"] .topActions {
   grid-template-columns: 1fr;
 }
@@ -2286,9 +2291,12 @@ body[data-miniapp="true"] .tablePlayTitle {
 }
 
 body[data-miniapp="true"] .tableScoreStrip {
-  left: 10px;
-  top: 8px;
-  border-radius: 6px;
+  left: clamp(180px, 18vw, 310px);
+  top: 14px;
+  border-radius: 8px;
+  background: rgba(6, 27, 27, .42);
+  border: 1px solid rgba(255, 234, 160, .24);
+  box-shadow: none;
 }
 
 body[data-miniapp="true"] .tableScoreStrip span {
@@ -2299,6 +2307,28 @@ body[data-miniapp="true"] .tableScoreStrip span {
 
 body[data-miniapp="true"] .tableScoreStrip b {
   font-size: 14px;
+}
+
+body[data-miniapp="true"] .tableScoreStrip span:not(.roomCodeLabel) {
+  display: none;
+}
+
+body[data-miniapp="true"] .tableScoreStrip .roomCodeLabel {
+  display: block;
+  min-width: clamp(190px, 24vw, 300px);
+  padding: 6px 14px;
+  color: rgba(255, 250, 220, .82);
+  text-align: left;
+  font-size: clamp(12px, 2.5vh, 16px);
+  border-right: 0;
+  letter-spacing: .02em;
+}
+
+body[data-miniapp="true"] .tableScoreStrip .roomCodeLabel b {
+  display: inline;
+  margin: 0 0 0 8px;
+  font-size: clamp(16px, 3.3vh, 22px);
+  color: #fff2a8;
 }
 
 body[data-miniapp="true"] .seat0 .seatTopInfo {

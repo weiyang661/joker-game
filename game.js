@@ -286,8 +286,13 @@ function makeLobbyPlayer(index, name, profiles = {}) {
     revealAnnouncement: "",
     lastPlay: null,
     finished: false,
+    botFilled: false,
     human: isOnlineHumanSeat(index)
   };
+}
+
+function isWaitingEmptySeat(player, index) {
+  return online.connected && online.waitingRoom && index > 0 && player && !player.human && !player.botFilled;
 }
 
 function setupWaitingRoom(options = {}) {
@@ -1444,9 +1449,18 @@ function renderTable() {
   const seats = state.players.map((player, index) => {
     const seatIndex = relativeSeatIndex(index);
     const isTurn = index === state.current && (!state.gameOver || state.continuingForNextLead);
+    const emptySeat = isWaitingEmptySeat(player, index);
     const team = online.connected && online.waitingRoom
       ? (player.human ? (online.readySeats[index] ? "已准备" : "未准备") : "人机候补")
       : player.id === localSeat() ? teamName(player.team) : visibleTeam(player);
+    if (emptySeat) {
+      return `<article class="seat seat${seatIndex} emptySeat" data-seat="${index}" style="left:${positions[seatIndex][0]};top:${positions[seatIndex][1]}">
+        <button class="seatInviteBtn" type="button" data-seat="${index}" aria-label="邀请或填入座位 ${index}">
+          <span>+</span>
+        </button>
+        <div class="name">空位 ${index}</div>
+      </article>`;
+    }
     const revealHands = shouldRevealHands();
     const handPreview = revealHands && player.hand.length
       ? `<div class="miniCards revealedHand">${player.hand.map(tinyCard).join("")}</div>`
@@ -2126,8 +2140,7 @@ el.hostBtn.addEventListener("click", async () => {
   online.seat = 0;
   online.hasSnapshot = true;
   state.players[0].name = cleanPlayerName(el.nameInput.value, "房主");
-  state.players[0].avatarUrl = rememberPlayerAvatar(bootParams.get("avatar") || savedPlayerAvatar());
-  rememberPlayerName(state.players[0].name);
+  state.players[0].avatarUrl = cleanAvatarUrl(bootParams.get("avatar"));
   online.waitingRoom = true;
   online.pendingRole = "host";
   sendSocket({ type: "create" });
@@ -2160,12 +2173,11 @@ async function joinRoomFromInputs(options = {}) {
   const name = cleanPlayerName(options.name != null ? options.name : el.nameInput.value, `玩家 ${requestedSeat}`);
   el.roomInput.value = roomId;
   el.nameInput.value = name;
-  rememberPlayerName(name);
   online.waitingRoom = true;
   online.readySeats = {};
   online.hasSnapshot = false;
   online.pendingRole = "join";
-  const avatarUrl = rememberPlayerAvatar(options.avatarUrl || bootParams.get("avatar") || savedPlayerAvatar());
+  const avatarUrl = cleanAvatarUrl(options.avatarUrl || bootParams.get("avatar"));
   sendSocket({ type: "join", roomId, seat: requestedSeat, name, avatarUrl });
   updateOnlineStatus("正在加入房间，等待房主同步牌局...");
   setJoining(true, "已发送加入请求", "等待房主同步牌局，请不要重复点击。");
@@ -2175,11 +2187,18 @@ el.joinBtn.addEventListener("click", () => {
   joinRoomFromInputs();
 });
 
+el.table.addEventListener("click", event => {
+  const invite = event.target.closest(".seatInviteBtn");
+  if (!invite) return;
+  const seat = Number(invite.dataset.seat);
+  if (!seat) return;
+  showSeatChoice(seat);
+});
+
 el.renameBtn.addEventListener("click", () => {
   const name = cleanPlayerName(el.nameInput.value, localSeat() === 0 ? "你" : `玩家 ${localSeat()}`);
-  rememberPlayerName(name);
   if (online.connected && !online.isHost) {
-    sendSocket({ type: "action", action: "rename", name, avatarUrl: savedPlayerAvatar() });
+    sendSocket({ type: "action", action: "rename", name, avatarUrl: cleanAvatarUrl(bootParams.get("avatar")) });
     return;
   }
   renameSeat(localSeat(), name);
@@ -2238,38 +2257,82 @@ function postMiniProgramRoom(roomId) {
   });
 }
 
-function rememberPlayerName(name) {
-  try {
-    localStorage.setItem("jokerPlayerName", name);
-  } catch {
-    // ignore storage failures in private browsing
+function showSeatChoice(seat) {
+  const existing = document.querySelector(".seatChoiceOverlay");
+  if (existing) existing.remove();
+  const overlay = document.createElement("section");
+  overlay.className = "seatChoiceOverlay";
+  overlay.innerHTML = `
+    <div class="seatChoiceCard">
+      <strong>空位 ${seat}</strong>
+      <span>请选择邀请好友加入，或先用人机占位测试。</span>
+      <div>
+        <button class="primary" data-action="invite">邀请微信好友</button>
+        <button data-action="bot">人机填入</button>
+        <button data-action="cancel">取消</button>
+      </div>
+    </div>
+  `;
+  overlay.addEventListener("click", event => {
+    const action = event.target.dataset.action;
+    if (!action && event.target !== overlay) return;
+    if (action === "invite") requestSeatInvite(seat);
+    if (action === "bot") fillSeatWithBot(seat);
+    overlay.remove();
+  });
+  document.body.appendChild(overlay);
+}
+
+function requestSeatInvite(seat) {
+  if (!online.connected || !online.roomId) {
+    updateOnlineStatus("请先开房，再邀请好友。");
+    return;
   }
+  const url = inviteUrl(online.roomId);
+  postMiniProgramRoom(online.roomId);
+  if (isMiniProgramView) {
+    state.tableNotice = `已准备好房间 ${online.roomId} 的邀请，请点右上角分享给微信好友`;
+    updateOnlineStatus(`邀请座位 ${seat}：请点右上角分享，好友打开后会直接进入房间`);
+    render();
+    return;
+  }
+  navigator.clipboard && navigator.clipboard.writeText(url).then(() => {
+    updateOnlineStatus(`邀请链接已复制：${url}`);
+  }).catch(() => {
+    window.prompt("复制这个邀请链接发给朋友：", url);
+  });
+}
+
+function fillSeatWithBot(seat) {
+  const player = state.players[seat];
+  if (!player) return;
+  if (online.connected && !online.isHost) {
+    updateOnlineStatus("只有房主可以用人机填入空位。");
+    return;
+  }
+  if (player.human) return;
+  player.botFilled = true;
+  player.name = `人机 ${seat}`;
+  player.avatarUrl = "";
+  state.tableNotice = `座位 ${seat} 已用人机填入`;
+  addLog(`座位 ${seat} 已用人机填入。`);
+  render();
+}
+
+function rememberPlayerName(name) {
+  return cleanPlayerName(name, "");
 }
 
 function rememberPlayerAvatar(url) {
-  const avatarUrl = cleanAvatarUrl(url);
-  try {
-    if (avatarUrl) localStorage.setItem("jokerPlayerAvatar", avatarUrl);
-  } catch {
-    // ignore storage failures in private browsing
-  }
-  return avatarUrl;
+  return cleanAvatarUrl(url);
 }
 
 function savedPlayerName() {
-  try {
-    return localStorage.getItem("jokerPlayerName") || "";
-  } catch {
-    return "";
-  }
+  return "";
 }
 
 function savedPlayerAvatar() {
-  try {
-    return cleanAvatarUrl(localStorage.getItem("jokerPlayerAvatar") || "");
-  } catch {
-    return "";
-  }
+  return "";
 }
 
 function openSocket() {

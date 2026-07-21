@@ -1376,6 +1376,88 @@ body[data-settlement="true"] .settlementOverlay {
   color: rgba(255,255,255,.88);
 }
 
+.emptySeat {
+  cursor: pointer;
+}
+
+.seatInviteBtn {
+  width: 58px;
+  height: 58px;
+  margin: 0 auto 6px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  border: 2px dashed rgba(255, 238, 166, .74);
+  background: rgba(7, 28, 27, .58);
+  color: #fff2ae;
+  box-shadow: 0 8px 18px rgba(0,0,0,.24);
+  cursor: pointer;
+}
+
+.seatInviteBtn span {
+  font-size: 40px;
+  line-height: 1;
+  font-weight: 900;
+  transform: translateY(-2px);
+}
+
+.seatChoiceOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2147482500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, .32);
+}
+
+.seatChoiceCard {
+  width: min(420px, 86vw);
+  padding: 22px;
+  border-radius: 14px;
+  background: rgba(9, 27, 29, .96);
+  border: 1px solid rgba(255, 234, 160, .34);
+  color: #f8f1df;
+  box-shadow: 0 24px 60px rgba(0,0,0,.42);
+}
+
+.seatChoiceCard strong {
+  display: block;
+  color: #fff2ae;
+  font-size: 24px;
+  margin-bottom: 8px;
+}
+
+.seatChoiceCard span {
+  display: block;
+  color: rgba(255,255,255,.74);
+  line-height: 1.45;
+  margin-bottom: 18px;
+}
+
+.seatChoiceCard div {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.seatChoiceCard button {
+  min-width: 120px;
+  height: 44px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,.16);
+  background: rgba(20, 34, 42, .94);
+  color: #f8f1df;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.seatChoiceCard button.primary {
+  background: linear-gradient(180deg, #efc56b, #a86a26);
+  color: #fff9d9;
+}
+
 .revealMark {
   display: inline-block;
   margin-top: 5px;

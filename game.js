@@ -142,7 +142,8 @@ const audioState = {
   musicTimer: null,
   beat: 0,
   voiceCache: new Map(),
-  voiceWarmed: false
+  voiceWarmed: false,
+  voiceActiveUntil: new Map()
 };
 const seenSocialEffects = new Set();
 const socialLabels = {
@@ -1312,9 +1313,9 @@ function playCardSfx() {
 function playInteractionSfx(kind) {
   startAudioOnce();
   if (kind === "tea") {
-    tone(460, 0.06, 0.025, "sine");
-    playNoise(0.18, 0.035, 0.5);
-    tone(640, 0.12, 0.025, "triangle", 0.58);
+    tone(360, 0.08, 0.012, "sine", 0.1);
+    playNoise(0.44, 0.018, 0.48);
+    tone(520, 0.18, 0.012, "sine", 0.56);
     return;
   }
   if (kind === "egg") {
@@ -1329,14 +1330,46 @@ function playInteractionSfx(kind) {
   tone(150, 0.09, 0.055, "sawtooth", 0.58);
 }
 
-function playVoicePresetSfx(kind) {
+function playVoicePresetSfx(kind, onDone) {
   startAudioOnce();
   const preset = voicePresets[kind];
   if (preset && preset.file) {
-    playVoiceAudioSources(voiceFileSources(preset.file), preset.label);
+    playVoiceAudioSources(voiceFileSources(preset.file), preset.label, 0, onDone);
     return;
   }
   console.warn("语音不存在", kind);
+  if (onDone) onDone();
+}
+
+function voiceDurationMs(kind) {
+  const preset = voicePresets[kind];
+  if (!preset || !preset.file) return 2600;
+  const loaded = voiceFileSources(preset.file)
+    .map(src => audioState.voiceCache.get(src))
+    .find(audio => audio && Number.isFinite(audio.duration) && audio.duration > 0);
+  return loaded ? Math.max(1400, Math.ceil(loaded.duration * 1000) + 350) : 3200;
+}
+
+function isVoiceSeatBusy(seat) {
+  const until = audioState.voiceActiveUntil.get(Number(seat)) || 0;
+  if (until <= Date.now()) {
+    audioState.voiceActiveUntil.delete(Number(seat));
+    return false;
+  }
+  return true;
+}
+
+function lockVoiceSeat(seat, durationMs) {
+  const key = Number(seat);
+  const until = Date.now() + Math.max(1200, durationMs || 2600);
+  audioState.voiceActiveUntil.set(key, until);
+  setTimeout(() => {
+    if ((audioState.voiceActiveUntil.get(key) || 0) <= until) audioState.voiceActiveUntil.delete(key);
+  }, Math.max(1200, durationMs || 2600) + 120);
+}
+
+function unlockVoiceSeat(seat) {
+  audioState.voiceActiveUntil.delete(Number(seat));
 }
 
 function voiceFileSources(file) {
@@ -1367,16 +1400,30 @@ function warmVoiceAudioCache() {
   });
 }
 
-function playVoiceAudioSources(sources, label, index = 0) {
+function playVoiceAudioSources(sources, label, index = 0, onDone) {
   const src = sources[index];
   if (!src) {
     console.warn("语音播放失败：所有路径都无法播放", label);
+    if (onDone) onDone();
     return;
   }
   const cached = getVoiceAudio(src);
   const audio = cached.cloneNode(true);
   audio.volume = 0.95;
-  audio.play().catch(() => playVoiceAudioSources(sources, label, index + 1));
+  let settled = false;
+  const finish = () => {
+    if (settled) return;
+    settled = true;
+    if (onDone) onDone();
+  };
+  const tryNext = () => {
+    if (settled) return;
+    settled = true;
+    playVoiceAudioSources(sources, label, index + 1, onDone);
+  };
+  audio.addEventListener("ended", finish, { once: true });
+  audio.addEventListener("error", tryNext, { once: true });
+  audio.play().catch(tryNext);
 }
 
 function socialEffectId() {
@@ -1385,6 +1432,10 @@ function socialEffectId() {
 
 function dispatchSocialEffect(effect) {
   const normalized = { id: socialEffectId(), from: localSeat(), ...effect };
+  if (normalized.kind === "voice" && isVoiceSeatBusy(normalized.from)) {
+    updateOnlineStatus("上一条语音还没播完，稍等一下再发。");
+    return;
+  }
   if (online.connected && !online.isHost) {
     if (normalized.kind === "voice") applySocialEffect(normalized);
     sendSocket({ type: "action", action: "socialEffect", effect: normalized });
@@ -1408,8 +1459,10 @@ function applySocialEffect(effect) {
     return;
   }
   if (effect.kind === "voice") {
+    if (isVoiceSeatBusy(effect.from)) return;
+    lockVoiceSeat(effect.from, voiceDurationMs(effect.voice));
     showVoiceBubble(effect);
-    playVoicePresetSfx(effect.voice);
+    playVoicePresetSfx(effect.voice, () => unlockVoiceSeat(effect.from));
     return;
   }
   showInteractionAnimation(effect);
@@ -1436,9 +1489,13 @@ function showVoiceMenu(event) {
   closeFloatingSocialMenus();
   const menu = document.createElement("div");
   menu.className = "voiceMenu";
+  const busy = isVoiceSeatBusy(localSeat());
   menu.innerHTML = Object.entries(voicePresets).map(([key, item]) =>
     `<button type="button" data-voice="${key}"><span>${item.icon || "🎙"}</span>${escapeHtml(item.label)}</button>`
   ).join("");
+  if (busy) {
+    menu.innerHTML = `<button type="button" disabled><span>语音</span>播放中，稍等</button>`;
+  }
   document.body.appendChild(menu);
   const rect = event.currentTarget.getBoundingClientRect();
   menu.style.left = `${Math.max(12, rect.left - 120)}px`;
@@ -1447,6 +1504,11 @@ function showVoiceMenu(event) {
     const button = click.target.closest("[data-voice]");
     if (!button) return;
     const voice = button.dataset.voice;
+    if (isVoiceSeatBusy(localSeat())) {
+      updateOnlineStatus("上一条语音还没播完，稍等一下再发。");
+      menu.remove();
+      return;
+    }
     dispatchSocialEffect({ kind: "voice", voice, text: voicePresets[voice].label });
     menu.remove();
   });
@@ -1503,19 +1565,24 @@ function showInteractionAnimation(effect) {
   const item = socialLabels[effect.kind] || socialLabels.tomato;
   const from = seatEffectPoint(effect.from);
   const to = seatEffectPoint(effect.to);
+  const isTea = effect.kind === "tea";
+  const impactDelay = isTea ? 610 : 555;
   const fly = document.createElement("div");
   fly.className = `socialProjectile socialProjectile-${effect.kind}`;
   fly.textContent = item.icon;
   fly.style.left = `${from.x}px`;
   fly.style.top = `${from.y}px`;
+  fly.style.setProperty("--fly-ms", isTea ? "680ms" : "560ms");
   document.body.appendChild(fly);
   requestAnimationFrame(() => {
     fly.classList.add("socialProjectileFlying");
     fly.style.left = `${to.x}px`;
     fly.style.top = `${to.y}px`;
   });
-  setTimeout(() => showInteractionImpact(effect.kind, item, to), 610);
-  setTimeout(() => fly.remove(), 880);
+  setTimeout(() => {
+    fly.remove();
+    showInteractionImpact(effect.kind, item, to);
+  }, impactDelay);
 }
 
 function seatEffectPoint(seat) {
@@ -1551,7 +1618,7 @@ function showInteractionImpact(kind, item, point) {
     ? `<b class="tomatoSplash"><span></span></b>`
     : kind === "egg"
       ? `<b class="eggSplash"><span></span></b>`
-      : `<b class="teaPour">${item.icon}</b><span class="teaStream"></span>`;
+      : `<b class="teaSet"><span class="teapot"></span><span class="teaArc"></span><span class="teacup"></span></b>`;
   impact.innerHTML = `${core}${pieces}`;
   document.body.appendChild(impact);
   setTimeout(() => impact.remove(), kind === "tea" ? 1050 : 1320);

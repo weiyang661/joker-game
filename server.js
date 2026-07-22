@@ -225,6 +225,7 @@ function createRoom(client, message) {
     creatorId: client.id,
     clients: new Map([[client.id, client]]),
     seats: Array.from({ length: 5 }, () => null),
+    voiceActiveUntil: new Map(),
     createdAt: Date.now()
   };
   rooms.set(roomId, room);
@@ -294,7 +295,14 @@ function handleRoomAction(room, client, message) {
     return;
   }
   if (message.action === "socialEffect") {
-    broadcast(room, { type: "socialEffect", effect: { ...(message.effect || {}), from: seatIndex } });
+    const effect = { ...(message.effect || {}), from: seatIndex };
+    if (effect.kind === "voice") {
+      const now = Date.now();
+      const busyUntil = room.voiceActiveUntil.get(seatIndex) || 0;
+      if (busyUntil > now) return;
+      room.voiceActiveUntil.set(seatIndex, now + 3200);
+    }
+    broadcast(room, { type: "socialEffect", effect });
     return;
   }
   sendCreator(room, { type: "clientMessage", clientId: client.id, payload: message });

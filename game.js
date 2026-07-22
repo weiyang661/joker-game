@@ -1500,6 +1500,18 @@ function showVoiceMenu(event) {
   const rect = event.currentTarget.getBoundingClientRect();
   menu.style.left = `${Math.max(12, rect.left - 120)}px`;
   menu.style.top = `${Math.max(12, rect.top - menu.offsetHeight - 8)}px`;
+  const closeOnOutside = evt => {
+    if (!menu.isConnected) {
+      document.removeEventListener("pointerdown", closeOnOutside, true);
+      return;
+    }
+    if (menu.contains(evt.target) || evt.target.closest(".voiceFab")) return;
+    menu.remove();
+    document.removeEventListener("pointerdown", closeOnOutside, true);
+  };
+  setTimeout(() => {
+    document.addEventListener("pointerdown", closeOnOutside, true);
+  }, 0);
   menu.addEventListener("click", click => {
     const button = click.target.closest("[data-voice]");
     if (!button) return;

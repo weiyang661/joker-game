@@ -1773,26 +1773,45 @@ body[data-settlement="true"] .settlementOverlay {
 .voiceMenu {
   position: fixed;
   z-index: 2147482700;
-  width: 220px;
-  padding: 8px;
+  width: 190px;
+  max-height: min(330px, 58vh);
+  padding: 6px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
   border-radius: 10px;
   background: rgba(8, 25, 26, .94);
   border: 1px solid rgba(255,255,255,.16);
   box-shadow: 0 16px 36px rgba(0,0,0,.36);
 }
 
+.voiceMenu::-webkit-scrollbar {
+  width: 6px;
+}
+
+.voiceMenu::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(255, 232, 160, .46);
+}
+
 .voiceMenu button {
   display: flex;
   width: 100%;
   align-items: center;
-  gap: 9px;
-  min-height: 40px;
+  gap: 7px;
+  min-height: 34px;
   margin: 0;
-  padding: 7px 10px;
+  padding: 6px 8px;
   border: 0;
   background: transparent;
   color: #fff5cf;
+  font-size: 12px;
+  line-height: 1.15;
   text-align: left;
+}
+
+.voiceMenu button span {
+  flex: 0 0 auto;
 }
 
 .voiceMenu button + button {
@@ -3028,55 +3047,80 @@ body[data-miniapp="true"] .socialPanel {
 }
 
 body[data-miniapp="true"] .socialPanelCard {
-  width: min(720px, calc(var(--mini-vw, 100vw) - 52px));
-  max-height: calc(var(--mini-vh, 100vh) - 40px);
-  padding: 10px 12px 12px;
+  width: min(560px, calc(var(--mini-vw, 100vw) - 72px));
+  max-height: calc(var(--mini-vh, 100vh) - 56px);
+  padding: 8px 10px 10px;
   overflow: hidden;
 }
 
 body[data-miniapp="true"] .socialPanelHead {
-  gap: 10px;
-  margin-bottom: 10px;
+  gap: 8px;
+  margin-bottom: 8px;
 }
 
 body[data-miniapp="true"] .socialPanelAvatar {
-  width: clamp(42px, 10vh, 62px);
-  height: clamp(42px, 10vh, 62px);
+  width: clamp(36px, 8vh, 52px);
+  height: clamp(36px, 8vh, 52px);
 }
 
 body[data-miniapp="true"] .socialPanelHead strong {
-  font-size: clamp(16px, 4.2vh, 24px);
+  font-size: clamp(14px, 3.5vh, 20px);
 }
 
 body[data-miniapp="true"] .socialPanelHead span {
-  font-size: clamp(10px, 2.6vh, 14px);
+  font-size: clamp(9px, 2.2vh, 12px);
 }
 
 body[data-miniapp="true"] .socialGiftGrid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
+  gap: 6px;
 }
 
 body[data-miniapp="true"] .socialGift {
-  min-height: clamp(70px, 18vh, 106px);
-  padding: 6px;
+  min-height: clamp(52px, 13vh, 78px);
+  padding: 5px;
 }
 
 body[data-miniapp="true"] .socialGiftIcon {
-  font-size: clamp(24px, 7vh, 38px);
+  font-size: clamp(18px, 5vh, 28px);
 }
 
 body[data-miniapp="true"] .socialGift b {
-  margin-top: 4px;
-  font-size: clamp(12px, 3.2vh, 16px);
+  margin-top: 2px;
+  font-size: clamp(10px, 2.6vh, 13px);
 }
 
 body[data-miniapp="true"] .socialGift em {
-  font-size: clamp(9px, 2.4vh, 12px);
+  font-size: clamp(8px, 2vh, 10px);
 }
 
 body[data-miniapp="true"] .voiceMenu {
-  width: min(220px, 28vw);
+  width: min(176px, 23vw);
+  max-height: min(230px, 48vh);
+  padding: 5px;
+}
+
+body[data-miniapp="true"] .voiceMenu button {
+  min-height: 28px;
+  padding: 4px 6px;
+  gap: 5px;
+  font-size: clamp(9px, 2.2vh, 12px);
+}
+
+body[data-miniapp="true"] .socialProjectile {
+  font-size: clamp(28px, 8vh, 40px);
+}
+
+body[data-miniapp="true"] .socialProjectile-tea {
+  font-size: clamp(26px, 7vh, 36px);
+}
+
+body[data-miniapp="true"] .socialProjectile-egg {
+  font-size: clamp(27px, 7.5vh, 38px);
+}
+
+body[data-miniapp="true"] .socialImpact {
+  transform: translate(-50%, -50%) scale(.72);
 }
 
 body[data-miniapp="true"] .voiceBubble {

@@ -149,9 +149,15 @@ const socialLabels = {
   egg: { label: "臭鸡蛋", icon: "🥚" }
 };
 const voicePresets = {
-  dede: { label: "得得得得得得得得", icon: "🎙" },
-  nice: { label: "漂亮！", icon: "👏" },
-  hurry: { label: "快点快点", icon: "⏱" }
+  voice01: { label: "各位观众全体起立", src: "音频/%E5%90%84%E4%BD%8D%E8%A7%82%E4%BC%97%E5%85%A8%E4%BD%93%E8%B5%B7%E7%AB%8B.wav" },
+  voice02: { label: "哎哟", src: "音频/%E5%93%8E%E5%93%9F.mp3" },
+  voice03: { label: "奸笑", src: "音频/%E5%A5%B8%E7%AC%91.mp3" },
+  voice04: { label: "得得得得得得", src: "音频/%E5%BE%97%E5%BE%97%E5%BE%97%E5%BE%97%E5%BE%97%E5%BE%97.wav" },
+  voice05: { label: "快点阿 阿姨", src: "音频/%E5%BF%AB%E7%82%B9%E9%98%BF%20%E9%98%BF%E5%A7%A8.mp3" },
+  voice06: { label: "我笑着玩", src: "音频/%E6%88%91%E7%AC%91%E7%9D%80%E7%8E%A9.mp3" },
+  voice07: { label: "玩游戏一定要笑", src: "音频/%E7%8E%A9%E6%B8%B8%E6%88%8F%E4%B8%80%E5%AE%9A%E8%A6%81%E7%AC%91.mp3" },
+  voice08: { label: "留不留皮", src: "音频/%E7%95%99%E4%B8%8D%E7%95%99%E7%9A%AE.mp3" },
+  voice09: { label: "给阿姨倒一杯卡布奇诺", src: "音频/%E7%BB%99%E9%98%BF%E5%A7%A8%E5%80%92%E4%B8%80%E6%9D%AF%E5%8D%A1%E5%B8%83%E5%A5%87%E8%AF%BA.mp3" }
 };
 
 function shuffle(list) {
@@ -1319,8 +1325,18 @@ function playInteractionSfx(kind) {
 
 function playVoicePresetSfx(kind) {
   startAudioOnce();
-  const pattern = kind === "hurry" ? [500, 500, 620, 500] : kind === "nice" ? [660, 820] : [440, 460, 440, 460, 440, 460, 440, 460];
-  pattern.forEach((freq, index) => tone(freq, 0.055, 0.04, "square", index * 0.075));
+  const preset = voicePresets[kind];
+  if (preset && preset.src) {
+    const audio = new Audio(preset.src);
+    audio.volume = 0.95;
+    audio.play().catch(() => {
+      tone(560, 0.08, 0.04, "square");
+      tone(720, 0.08, 0.04, "square", 0.09);
+    });
+    return;
+  }
+  tone(560, 0.08, 0.04, "square");
+  tone(720, 0.08, 0.04, "square", 0.09);
 }
 
 function socialEffectId() {
@@ -1379,7 +1395,7 @@ function showVoiceMenu(event) {
   const menu = document.createElement("div");
   menu.className = "voiceMenu";
   menu.innerHTML = Object.entries(voicePresets).map(([key, item]) =>
-    `<button type="button" data-voice="${key}"><span>${item.icon}</span>${item.label}</button>`
+    `<button type="button" data-voice="${key}"><span>${item.icon || "🎙"}</span>${escapeHtml(item.label)}</button>`
   ).join("");
   document.body.appendChild(menu);
   const rect = event.currentTarget.getBoundingClientRect();
@@ -1459,7 +1475,7 @@ function showVoiceBubble(effect) {
   const preset = voicePresets[effect.voice] || { label: effect.text || "语音", icon: "🎙" };
   const bubble = document.createElement("div");
   bubble.className = "voiceBubble";
-  bubble.innerHTML = `<strong>${escapeHtml((from && from.name) || "玩家")}</strong><span>${preset.icon} ${escapeHtml(preset.label)}</span>`;
+  bubble.innerHTML = `<strong>${escapeHtml((from && from.name) || "玩家")}</strong><span>${preset.icon || "🎙"} ${escapeHtml(preset.label)}</span>`;
   document.body.appendChild(bubble);
   setTimeout(() => bubble.remove(), 2200);
 }

@@ -149,15 +149,15 @@ const socialLabels = {
   egg: { label: "臭鸡蛋", icon: "🥚" }
 };
 const voicePresets = {
-  voice01: { label: "各位观众全体起立", src: "音频/%E5%90%84%E4%BD%8D%E8%A7%82%E4%BC%97%E5%85%A8%E4%BD%93%E8%B5%B7%E7%AB%8B.wav" },
-  voice02: { label: "哎哟", src: "音频/%E5%93%8E%E5%93%9F.mp3" },
-  voice03: { label: "奸笑", src: "音频/%E5%A5%B8%E7%AC%91.mp3" },
-  voice04: { label: "得得得得得得", src: "音频/%E5%BE%97%E5%BE%97%E5%BE%97%E5%BE%97%E5%BE%97%E5%BE%97.wav" },
-  voice05: { label: "快点阿 阿姨", src: "音频/%E5%BF%AB%E7%82%B9%E9%98%BF%20%E9%98%BF%E5%A7%A8.mp3" },
-  voice06: { label: "我笑着玩", src: "音频/%E6%88%91%E7%AC%91%E7%9D%80%E7%8E%A9.mp3" },
-  voice07: { label: "玩游戏一定要笑", src: "音频/%E7%8E%A9%E6%B8%B8%E6%88%8F%E4%B8%80%E5%AE%9A%E8%A6%81%E7%AC%91.mp3" },
-  voice08: { label: "留不留皮", src: "音频/%E7%95%99%E4%B8%8D%E7%95%99%E7%9A%AE.mp3" },
-  voice09: { label: "给阿姨倒一杯卡布奇诺", src: "音频/%E7%BB%99%E9%98%BF%E5%A7%A8%E5%80%92%E4%B8%80%E6%9D%AF%E5%8D%A1%E5%B8%83%E5%A5%87%E8%AF%BA.mp3" }
+  voice01: { label: "各位观众全体起立", src: "音频/各位观众全体起立.wav" },
+  voice02: { label: "哎哟", src: "音频/哎哟.mp3" },
+  voice03: { label: "奸笑", src: "音频/奸笑.mp3" },
+  voice04: { label: "得得得得得得", src: "音频/得得得得得得.wav" },
+  voice05: { label: "快点阿 阿姨", src: "音频/快点阿 阿姨.mp3" },
+  voice06: { label: "我笑着玩", src: "音频/我笑着玩.mp3" },
+  voice07: { label: "玩游戏一定要笑", src: "音频/玩游戏一定要笑.mp3" },
+  voice08: { label: "留不留皮", src: "音频/留不留皮.mp3" },
+  voice09: { label: "给阿姨倒一杯卡布奇诺", src: "音频/给阿姨倒一杯卡布奇诺.mp3" }
 };
 
 function shuffle(list) {
@@ -1328,15 +1328,12 @@ function playVoicePresetSfx(kind) {
   const preset = voicePresets[kind];
   if (preset && preset.src) {
     const audio = new Audio(preset.src);
+    audio.preload = "auto";
     audio.volume = 0.95;
-    audio.play().catch(() => {
-      tone(560, 0.08, 0.04, "square");
-      tone(720, 0.08, 0.04, "square", 0.09);
-    });
+    audio.play().catch(error => console.warn("语音播放失败", preset.src, error));
     return;
   }
-  tone(560, 0.08, 0.04, "square");
-  tone(720, 0.08, 0.04, "square", 0.09);
+  console.warn("语音不存在", kind);
 }
 
 function socialEffectId() {
@@ -1346,6 +1343,7 @@ function socialEffectId() {
 function dispatchSocialEffect(effect) {
   const normalized = { id: socialEffectId(), from: localSeat(), ...effect };
   if (online.connected && !online.isHost) {
+    if (normalized.kind === "voice") applySocialEffect(normalized);
     sendSocket({ type: "action", action: "socialEffect", effect: normalized });
     return;
   }

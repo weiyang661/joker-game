@@ -39,7 +39,9 @@ const server = http.createServer((req, res) => {
       ".png": "image/png",
       ".jpg": "image/jpeg",
       ".jpeg": "image/jpeg",
-      ".webp": "image/webp"
+      ".webp": "image/webp",
+      ".mp3": "audio/mpeg",
+      ".wav": "audio/wav"
     };
     res.writeHead(200, { "Content-Type": types[ext] || "application/octet-stream", "Cache-Control": "no-store" });
     res.end(data);

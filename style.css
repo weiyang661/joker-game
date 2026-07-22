@@ -1958,6 +1958,15 @@ body[data-settlement="true"] .settlementOverlay {
   transform: translateY(-2px);
 }
 
+.botSeatBtn span {
+  font-size: 24px;
+  transform: none;
+}
+
+.botWaitingSeat .meta {
+  color: rgba(255, 242, 174, .9);
+}
+
 .seatChoiceOverlay {
   position: fixed;
   inset: 0;

@@ -400,6 +400,26 @@ function firstOpenSeat(preferredSeat = null) {
   return null;
 }
 
+function fillEmptySeatsWithBots() {
+  let changed = false;
+  for (let seat = 1; seat <= 4; seat += 1) {
+    const player = state.players[seat];
+    if (!player || player.human || player.botFilled) continue;
+    if (online.connected && online.isHost) {
+      sendSocket({ type: "action", action: "fillBot", seat });
+    }
+    player.botFilled = true;
+    player.human = false;
+    player.name = `人机 ${seat}`;
+    player.avatarUrl = "";
+    changed = true;
+  }
+  if (changed) {
+    state.tableNotice = "空位已自动用人机补齐，开始发牌";
+    addLog("空位已自动用人机补齐。");
+  }
+}
+
 function startGame(options = {}) {
   if (options.resetMatch) {
     state.playerMatch = [0, 0, 0, 0, 0];
@@ -1942,6 +1962,7 @@ function renderTable() {
     const seatIndex = relativeSeatIndex(index);
     const isTurn = index === state.current && (!state.gameOver || state.continuingForNextLead);
     const emptySeat = isWaitingEmptySeat(player, index);
+    const botWaitingSeat = online.connected && online.waitingRoom && index > 0 && player && !player.human && player.botFilled;
     const team = online.connected && online.waitingRoom
       ? (player.human ? (online.readySeats[index] ? "已准备" : "未准备") : "人机候补")
       : player.id === localSeat() ? teamName(player.team) : visibleTeam(player);
@@ -1951,6 +1972,15 @@ function renderTable() {
           <span>+</span>
         </button>
         <div class="name">空位 ${index}</div>
+      </article>`;
+    }
+    if (botWaitingSeat) {
+      return `<article class="seat seat${seatIndex} emptySeat botWaitingSeat" data-seat="${index}" style="left:${positions[seatIndex][0]};top:${positions[seatIndex][1]}">
+        <button class="seatInviteBtn botSeatBtn" type="button" data-seat="${index}" aria-label="管理人机座位 ${index}">
+          <span>人</span>
+        </button>
+        <div class="name">人机 ${index}</div>
+        <div class="meta">可替换</div>
       </article>`;
     }
     const revealHands = shouldRevealHands();
@@ -2626,6 +2656,7 @@ el.startOnlineBtn.addEventListener("click", () => {
     render();
     return;
   }
+  fillEmptySeatsWithBots();
   online.waitingRoom = false;
   startGame({ preserveNames: preservedOnlineNames() });
 });
@@ -2809,15 +2840,17 @@ function postMiniProgramShare(roomId) {
 function showSeatChoice(seat) {
   const existing = document.querySelector(".seatChoiceOverlay");
   if (existing) existing.remove();
+  const player = state.players[seat];
+  const isBotSeat = !!(player && player.botFilled && !player.human);
   const overlay = document.createElement("section");
   overlay.className = "seatChoiceOverlay";
   overlay.innerHTML = `
     <div class="seatChoiceCard">
-      <strong>空位 ${seat}</strong>
-      <span>请选择邀请好友加入，或先用人机占位测试。</span>
+      <strong>${isBotSeat ? `人机 ${seat}` : `空位 ${seat}`}</strong>
+      <span>${isBotSeat ? "这个座位目前是人机，可以踢出，也可以邀请真人加入替换。" : "请选择邀请好友加入，或先用人机占位测试。"}</span>
       <div>
         <button class="primary" data-action="invite">邀请微信好友</button>
-        <button data-action="bot">人机填入</button>
+        ${isBotSeat ? `<button data-action="removeBot">踢出人机</button>` : `<button data-action="bot">人机填入</button>`}
         <button data-action="cancel">取消</button>
       </div>
     </div>
@@ -2827,6 +2860,7 @@ function showSeatChoice(seat) {
     if (!action && event.target !== overlay) return;
     if (action === "invite") requestSeatInvite(seat);
     if (action === "bot") fillSeatWithBot(seat);
+    if (action === "removeBot") removeSeatBot(seat);
     overlay.remove();
   });
   document.body.appendChild(overlay);
@@ -2871,6 +2905,26 @@ function fillSeatWithBot(seat) {
   player.avatarUrl = "";
   state.tableNotice = `座位 ${seat} 已用人机填入`;
   addLog(`座位 ${seat} 已用人机填入。`);
+  render();
+}
+
+function removeSeatBot(seat) {
+  const player = state.players[seat];
+  if (!player) return;
+  if (online.connected) {
+    if (!online.isHost) updateOnlineStatus("只有创建房间的人可以踢出人机。");
+    else sendSocket({ type: "action", action: "removeBot", seat });
+    return;
+  }
+  if (!player.botFilled || player.human) return;
+  player.botFilled = false;
+  player.human = false;
+  player.name = `空位 ${seat}`;
+  player.avatarUrl = "";
+  player.hand = [];
+  player.score = 0;
+  state.tableNotice = `座位 ${seat} 已空出`;
+  addLog(`座位 ${seat} 已空出。`);
   render();
 }
 

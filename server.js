@@ -294,6 +294,19 @@ function handleRoomAction(room, client, message) {
     broadcastRoomState(room);
     return;
   }
+  if (message.action === "removeBot") {
+    if (client.id !== room.creatorId) {
+      send(client, { type: "error", message: "只有创建房间的人可以踢出人机" });
+      return;
+    }
+    const targetSeat = Number(message.seat);
+    if (targetSeat < 1 || targetSeat > 4) return;
+    if (room.seats[targetSeat] && room.seats[targetSeat].bot && !room.seats[targetSeat].human) {
+      room.seats[targetSeat] = null;
+      broadcastRoomState(room);
+    }
+    return;
+  }
   if (message.action === "socialEffect") {
     const effect = { ...(message.effect || {}), from: seatIndex };
     if (effect.kind === "voice") {
@@ -354,11 +367,11 @@ function humanSeat(client, seat, name, avatarUrl) {
 }
 
 function firstOpenSeat(room, preferred) {
-  if (preferred >= 0 && preferred <= 4 && !room.seats[preferred]) return preferred;
+  if (preferred >= 0 && preferred <= 4 && (!room.seats[preferred] || room.seats[preferred].bot)) return preferred;
   for (let seat = 1; seat <= 4; seat += 1) {
-    if (!room.seats[seat]) return seat;
+    if (!room.seats[seat] || room.seats[seat].bot) return seat;
   }
-  return !room.seats[0] ? 0 : null;
+  return !room.seats[0] || room.seats[0].bot ? 0 : null;
 }
 
 function broadcastRoomState(room) {

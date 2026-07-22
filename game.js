@@ -1535,21 +1535,26 @@ function seatEffectPoint(seat) {
 
 function showInteractionImpact(kind, item, point) {
   const impact = document.createElement("div");
-  const count = kind === "tea" ? 6 : kind === "egg" ? 9 : 10;
+  const count = kind === "tea" ? 0 : kind === "egg" ? 10 : 12;
   impact.className = `socialImpact socialImpact-${kind}`;
   impact.style.left = `${point.x}px`;
   impact.style.top = `${point.y}px`;
   const pieces = Array.from({ length: count }, (_, index) => {
     const angle = (Math.PI * 2 * index) / count + Math.random() * 0.45;
-    const distance = 18 + Math.random() * (kind === "tomato" ? 48 : 36);
+    const distance = 26 + Math.random() * (kind === "tomato" ? 70 : 54);
     const x = Math.cos(angle) * distance;
     const y = Math.sin(angle) * distance;
     const rotate = Math.round(Math.random() * 180 - 90);
     return `<i style="--x:${x.toFixed(1)}px;--y:${y.toFixed(1)}px;--r:${rotate}deg"></i>`;
   }).join("");
-  impact.innerHTML = `<b>${item.icon}</b>${pieces}`;
+  const core = kind === "tomato"
+    ? `<b class="tomatoSplash"><span></span></b>`
+    : kind === "egg"
+      ? `<b class="eggSplash"><span></span></b>`
+      : `<b class="teaPour">${item.icon}</b><span class="teaStream"></span>`;
+  impact.innerHTML = `${core}${pieces}`;
   document.body.appendChild(impact);
-  setTimeout(() => impact.remove(), 980);
+  setTimeout(() => impact.remove(), kind === "tea" ? 1050 : 1320);
 }
 
 function showVoiceBubble(effect) {

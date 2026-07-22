@@ -1471,6 +1471,133 @@ body[data-settlement="true"] .settlementOverlay {
   animation: socialImpactCore .62s ease-out forwards;
 }
 
+.socialImpact b.tomatoSplash,
+.socialImpact b.eggSplash {
+  display: block;
+  font-size: 0;
+  line-height: 1;
+}
+
+.socialImpact b.tomatoSplash {
+  width: 128px;
+  height: 104px;
+  border-radius: 44% 56% 48% 52% / 58% 42% 58% 42%;
+  background:
+    radial-gradient(circle at 37% 34%, rgba(255, 139, 112, .92) 0 12%, transparent 13%),
+    radial-gradient(circle at 63% 58%, rgba(161, 0, 0, .45) 0 13%, transparent 14%),
+    radial-gradient(circle at 50% 50%, #ff432e 0 48%, #d91418 70%, #8e0710 100%);
+  box-shadow:
+    inset 10px 8px 18px rgba(255,255,255,.22),
+    inset -16px -14px 22px rgba(96, 0, 0, .28),
+    0 10px 18px rgba(0,0,0,.34);
+  animation: tomatoSplatCore 1.18s ease-out forwards;
+}
+
+.socialImpact b.tomatoSplash::before,
+.socialImpact b.tomatoSplash::after {
+  content: "";
+  position: absolute;
+  background: #e7191d;
+  border-radius: 999px 999px 999px 10px;
+  filter: drop-shadow(0 3px 4px rgba(0,0,0,.18));
+}
+
+.socialImpact b.tomatoSplash::before {
+  width: 38px;
+  height: 70px;
+  left: -18px;
+  top: 22px;
+  transform: rotate(22deg);
+}
+
+.socialImpact b.tomatoSplash::after {
+  width: 34px;
+  height: 54px;
+  right: -14px;
+  top: 12px;
+  transform: rotate(-35deg);
+}
+
+.socialImpact b.tomatoSplash span {
+  position: absolute;
+  left: 47px;
+  top: 5px;
+  width: 36px;
+  height: 26px;
+  background: #4fc448;
+  clip-path: polygon(50% 0, 62% 34%, 100% 18%, 72% 52%, 94% 88%, 54% 68%, 25% 100%, 33% 58%, 0 42%, 38% 35%);
+  filter: drop-shadow(0 2px 3px rgba(0,0,0,.22));
+}
+
+.socialImpact b.eggSplash {
+  width: 126px;
+  height: 106px;
+  border-radius: 58% 42% 62% 38% / 44% 56% 40% 60%;
+  background:
+    radial-gradient(circle at 50% 50%, #ffc83b 0 17%, #f5a321 18% 28%, transparent 29%),
+    radial-gradient(circle at 44% 48%, rgba(255,255,255,.95) 0 38%, rgba(246,244,232,.92) 50%, rgba(232,219,190,.74) 71%, transparent 72%);
+  box-shadow:
+    inset 8px 8px 18px rgba(255,255,255,.45),
+    inset -10px -10px 18px rgba(140,110,70,.24),
+    0 10px 18px rgba(0,0,0,.28);
+  animation: eggSplatCore 1.18s ease-out forwards;
+}
+
+.socialImpact b.eggSplash::before,
+.socialImpact b.eggSplash::after {
+  content: "";
+  position: absolute;
+  width: 36px;
+  height: 48px;
+  background: linear-gradient(135deg, #fff5dc, #efcfa6);
+  clip-path: polygon(0 0, 100% 14%, 72% 42%, 100% 72%, 48% 100%, 24% 61%, 0 42%, 20% 20%);
+  filter: drop-shadow(0 4px 5px rgba(0,0,0,.2));
+}
+
+.socialImpact b.eggSplash::before {
+  left: -30px;
+  top: -10px;
+  transform: rotate(-24deg);
+}
+
+.socialImpact b.eggSplash::after {
+  right: -22px;
+  bottom: 8px;
+  transform: rotate(27deg);
+}
+
+.socialImpact b.eggSplash span {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 52px;
+  height: 64px;
+  transform: translate(-50%, -50%);
+  border-radius: 52% 48% 55% 45%;
+  background: radial-gradient(circle at 42% 34%, #ffe680 0 18%, #ffbd25 20% 64%, #d9800b 100%);
+  box-shadow: inset 5px 5px 10px rgba(255,255,255,.38), 0 5px 8px rgba(0,0,0,.2);
+}
+
+.socialImpact b.teaPour {
+  font-size: 54px;
+  animation: teaPourCore 1s ease-out forwards;
+  transform-origin: 70% 70%;
+}
+
+.socialImpact .teaStream {
+  position: absolute;
+  left: -10px;
+  top: 8px;
+  width: 36px;
+  height: 92px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(215, 155, 85, .94), rgba(151, 91, 47, .18));
+  filter: blur(.2px) drop-shadow(0 4px 5px rgba(0,0,0,.14));
+  transform: rotate(18deg);
+  transform-origin: top center;
+  animation: teaStreamPour 1s ease-out forwards;
+}
+
 .socialImpact i {
   position: absolute;
   left: 0;
@@ -1482,14 +1609,16 @@ body[data-settlement="true"] .settlementOverlay {
 }
 
 .socialImpact-tomato i {
-  border-radius: 999px 999px 999px 4px;
+  width: 18px;
+  height: 20px;
+  border-radius: 999px 999px 999px 6px;
   background: radial-gradient(circle at 34% 30%, #ffb1a0 0 16%, #f04a31 18% 62%, #a81216 100%);
   box-shadow: 0 0 0 1px rgba(130, 0, 0, .16), 0 4px 8px rgba(0,0,0,.2);
 }
 
 .socialImpact-egg i {
-  width: 15px;
-  height: 10px;
+  width: 24px;
+  height: 16px;
   border-radius: 70% 40% 58% 36%;
   background: linear-gradient(135deg, #fffdf2, #f2dfad);
   box-shadow: inset -2px -1px 0 rgba(196, 146, 59, .28), 0 3px 6px rgba(0,0,0,.18);
@@ -1500,19 +1629,37 @@ body[data-settlement="true"] .settlementOverlay {
   border-radius: 50%;
 }
 
-.socialImpact-tea i {
-  width: 11px;
-  height: 18px;
-  border-radius: 999px;
-  background: linear-gradient(#d79b55, #8d5834);
-  opacity: .9;
-  box-shadow: 0 3px 7px rgba(0,0,0,.18);
-}
-
 @keyframes socialImpactCore {
   0% { opacity: 1; transform: translate(-50%, -50%) scale(.7) rotate(-10deg); }
   45% { opacity: 1; transform: translate(-50%, -50%) scale(1.22) rotate(8deg); }
   100% { opacity: 0; transform: translate(-50%, -50%) scale(.72) rotate(18deg); }
+}
+
+@keyframes tomatoSplatCore {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(.45) rotate(-12deg); }
+  18% { opacity: 1; transform: translate(-50%, -50%) scale(1.22) rotate(7deg); }
+  76% { opacity: .96; transform: translate(-50%, -50%) scale(1) rotate(-2deg); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(.92) rotate(4deg); }
+}
+
+@keyframes eggSplatCore {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(.45) rotate(10deg); }
+  18% { opacity: 1; transform: translate(-50%, -50%) scale(1.16) rotate(-8deg); }
+  78% { opacity: .96; transform: translate(-50%, -50%) scale(1) rotate(2deg); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(.92) rotate(-4deg); }
+}
+
+@keyframes teaPourCore {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(.75) rotate(-10deg); }
+  18% { opacity: 1; transform: translate(-60%, -55%) scale(1) rotate(-34deg); }
+  72% { opacity: 1; transform: translate(-60%, -55%) scale(1) rotate(-34deg); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(.82) rotate(-18deg); }
+}
+
+@keyframes teaStreamPour {
+  0% { opacity: 0; transform: rotate(18deg) scaleY(.12); }
+  20%, 72% { opacity: .92; transform: rotate(18deg) scaleY(1); }
+  100% { opacity: 0; transform: rotate(18deg) scaleY(.35); }
 }
 
 @keyframes socialImpactPiece {

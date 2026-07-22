@@ -149,15 +149,15 @@ const socialLabels = {
   egg: { label: "臭鸡蛋", icon: "🥚" }
 };
 const voicePresets = {
-  voice01: { label: "各位观众全体起立", src: "音频/各位观众全体起立.wav" },
-  voice02: { label: "哎哟", src: "音频/哎哟.mp3" },
-  voice03: { label: "奸笑", src: "音频/奸笑.mp3" },
-  voice04: { label: "得得得得得得", src: "音频/得得得得得得.wav" },
-  voice05: { label: "快点阿 阿姨", src: "音频/快点阿 阿姨.mp3" },
-  voice06: { label: "我笑着玩", src: "音频/我笑着玩.mp3" },
-  voice07: { label: "玩游戏一定要笑", src: "音频/玩游戏一定要笑.mp3" },
-  voice08: { label: "留不留皮", src: "音频/留不留皮.mp3" },
-  voice09: { label: "给阿姨倒一杯卡布奇诺", src: "音频/给阿姨倒一杯卡布奇诺.mp3" }
+  voice01: { label: "各位观众全体起立", file: "各位观众全体起立.wav" },
+  voice02: { label: "哎哟", file: "哎哟.mp3" },
+  voice03: { label: "奸笑", file: "奸笑.mp3" },
+  voice04: { label: "得得得得得得", file: "得得得得得得.wav" },
+  voice05: { label: "快点阿 阿姨", file: "快点阿 阿姨.mp3" },
+  voice06: { label: "我笑着玩", file: "我笑着玩.mp3" },
+  voice07: { label: "玩游戏一定要笑", file: "玩游戏一定要笑.mp3" },
+  voice08: { label: "留不留皮", file: "留不留皮.mp3" },
+  voice09: { label: "给阿姨倒一杯卡布奇诺", file: "给阿姨倒一杯卡布奇诺.mp3" }
 };
 
 function shuffle(list) {
@@ -1326,14 +1326,26 @@ function playInteractionSfx(kind) {
 function playVoicePresetSfx(kind) {
   startAudioOnce();
   const preset = voicePresets[kind];
-  if (preset && preset.src) {
-    const audio = new Audio(preset.src);
-    audio.preload = "auto";
-    audio.volume = 0.95;
-    audio.play().catch(error => console.warn("语音播放失败", preset.src, error));
+  if (preset && preset.file) {
+    playVoiceAudioSources([
+      `音频/${preset.file}`,
+      preset.file
+    ], preset.label);
     return;
   }
   console.warn("语音不存在", kind);
+}
+
+function playVoiceAudioSources(sources, label, index = 0) {
+  const src = sources[index];
+  if (!src) {
+    console.warn("语音播放失败：所有路径都无法播放", label);
+    return;
+  }
+  const audio = new Audio(src);
+  audio.preload = "auto";
+  audio.volume = 0.95;
+  audio.play().catch(() => playVoiceAudioSources(sources, label, index + 1));
 }
 
 function socialEffectId() {

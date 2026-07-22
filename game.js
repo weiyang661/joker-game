@@ -111,10 +111,24 @@ const el = {
   settlementNextBtn: document.querySelector("#settlementNextBtn")
 };
 
+function getOnlineSessionId() {
+  try {
+    const key = "joker_online_session_id";
+    const existing = sessionStorage.getItem(key);
+    if (existing) return existing;
+    const next = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+    sessionStorage.setItem(key, next);
+    return next;
+  } catch {
+    return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  }
+}
+
 const online = {
   connected: false,
   isHost: false,
   socket: null,
+  sessionId: getOnlineSessionId(),
   roomId: "",
   clientId: "",
   creatorId: "",
@@ -128,7 +142,9 @@ const online = {
   snapshotQueued: false,
   pendingSnapshot: null,
   connectionPromise: null,
-  pendingRole: ""
+  pendingRole: "",
+  reconnectTimer: null,
+  reconnectAttempts: 0
 };
 
 let menuMode = "full";
@@ -246,7 +262,7 @@ function escapeHtml(value) {
 }
 
 function localSeat() {
-  return online.connected ? online.seat : 0;
+  return online.roomId ? online.seat : 0;
 }
 
 function localPlayer() {
@@ -258,15 +274,16 @@ function relativeSeatIndex(seat) {
 }
 
 function isHostRuntime() {
-  return !online.connected || online.isHost;
+  return !online.roomId || online.isHost;
 }
 
 function isOnlineRoomMember() {
-  return online.connected && !!online.roomId;
+  return !!online.roomId;
 }
 
 function isHumanControlled(seat) {
-  if (!online.connected) return seat === 0;
+  if (!online.roomId) return seat === 0;
+  if (!online.connected) return false;
   if (!online.isHost) return seat === localSeat();
   return seat === 0 || Object.prototype.hasOwnProperty.call(online.seatClients, seat);
 }
@@ -1787,6 +1804,7 @@ function applyRoomState(message) {
   if (Number.isFinite(Number(message.seat))) online.seat = Number(message.seat);
   online.isHost = !!online.clientId && online.clientId === online.creatorId;
   online.connected = true;
+  cancelReconnect();
 
   online.seatClients = {};
   online.clientSeats = {};
@@ -1796,7 +1814,7 @@ function applyRoomState(message) {
   seats.forEach((seatInfo, index) => {
     if (!seatInfo) return;
     profiles[index] = { name: seatInfo.name || `玩家 ${index}`, avatarUrl: seatInfo.avatarUrl || "" };
-    if (seatInfo.human && seatInfo.clientId) {
+    if (seatInfo.human && seatInfo.clientId && seatInfo.connected !== false) {
       online.seatClients[index] = seatInfo.clientId;
       online.clientSeats[seatInfo.clientId] = index;
     }
@@ -1833,6 +1851,16 @@ function applyRoomState(message) {
 
 function broadcastSnapshot() {
   if (!online.connected || !online.isHost || !online.socket || online.socket.readyState !== WebSocket.OPEN) return;
+  sendSocket({
+    type: "stateSnapshot",
+    payload: {
+      type: "snapshot",
+      state: serializeState(),
+      roomId: online.roomId,
+      waitingRoom: online.waitingRoom,
+      readySeats: online.readySeats
+    }
+  });
   for (const [seat, clientId] of Object.entries(online.seatClients)) {
     if (clientId === online.clientId) continue;
     sendSocket({
@@ -1854,6 +1882,48 @@ function broadcastSnapshot() {
 function sendSocket(message) {
   if (online.socket && online.socket.readyState === WebSocket.OPEN) {
     online.socket.send(JSON.stringify(message));
+    return true;
+  }
+  if (online.roomId) scheduleReconnect();
+  return false;
+}
+
+function cancelReconnect() {
+  if (!online.reconnectTimer) return;
+  clearTimeout(online.reconnectTimer);
+  online.reconnectTimer = null;
+}
+
+function scheduleReconnect() {
+  if (!online.roomId || online.reconnectTimer) return;
+  const delay = Math.min(12000, 800 * (2 ** Math.min(online.reconnectAttempts, 4)));
+  online.reconnectAttempts += 1;
+  state.tableNotice = "联机中断，正在自动重连...";
+  updateOnlineStatus("联机中断，正在自动重连...");
+  render();
+  online.reconnectTimer = setTimeout(() => {
+    online.reconnectTimer = null;
+    rejoinCurrentRoom();
+  }, delay);
+}
+
+async function rejoinCurrentRoom() {
+  if (!online.roomId) return;
+  try {
+    await openSocket();
+    const player = state.players[online.seat] || {};
+    online.pendingRole = "rejoin";
+    sendSocket({
+      type: "rejoin",
+      roomId: online.roomId,
+      seat: online.seat,
+      sessionId: online.sessionId,
+      name: player.name || playerNameFallback(),
+      avatarUrl: player.avatarUrl || cleanAvatarUrl(bootParams.get("avatar"))
+    });
+    updateOnlineStatus("正在重连牌局...");
+  } catch {
+    scheduleReconnect();
   }
 }
 
@@ -2694,7 +2764,8 @@ el.hostBtn.addEventListener("click", async () => {
     type: "create",
     roomId: requestedRoomId,
     name: state.players[0].name,
-    avatarUrl: state.players[0].avatarUrl
+    avatarUrl: state.players[0].avatarUrl,
+    sessionId: online.sessionId
   });
   setJoining(false);
   render();
@@ -2730,7 +2801,7 @@ async function joinRoomFromInputs(options = {}) {
   online.hasSnapshot = false;
   online.pendingRole = "join";
   const avatarUrl = cleanAvatarUrl(options.avatarUrl || bootParams.get("avatar"));
-  sendSocket({ type: "join", roomId, seat: requestedSeat, name, avatarUrl });
+  sendSocket({ type: "join", roomId, seat: requestedSeat, name, avatarUrl, sessionId: online.sessionId });
   updateOnlineStatus("正在加入房间，等待房主同步牌局...");
   setJoining(true, "已发送加入请求", "等待房主同步牌局，请不要重复点击。");
 }
@@ -2956,6 +3027,8 @@ function openSocket() {
     };
     socket.addEventListener("open", () => {
       online.connected = true;
+      online.reconnectAttempts = 0;
+      cancelReconnect();
       updateOnlineStatus();
       clearPromise();
       resolve();
@@ -2968,16 +3041,27 @@ function openSocket() {
       }
     });
     socket.addEventListener("close", () => {
+      if (online.socket === socket) online.socket = null;
       online.connected = false;
-      online.pendingRole = "";
+      if (online.pendingRole !== "rejoin") online.pendingRole = "";
       setJoining(false);
       clearPromise();
+      if (online.roomId) {
+        scheduleReconnect();
+        return;
+      }
       updateOnlineStatus("联机已断开");
     });
     socket.addEventListener("error", () => {
-      online.pendingRole = "";
+      if (online.socket === socket) online.socket = null;
+      if (online.pendingRole !== "rejoin") online.pendingRole = "";
       setJoining(false);
       clearPromise();
+      if (online.roomId) {
+        scheduleReconnect();
+        reject(new Error("socket failed"));
+        return;
+      }
       updateOnlineStatus("连接失败，请刷新后重试，或等待 Render 服务唤醒");
       reject(new Error("socket failed"));
     }, { once: true });
@@ -2992,6 +3076,7 @@ function handleSocketMessage(message) {
       return;
     }
     online.pendingRole = "";
+    cancelReconnect();
     online.roomId = message.roomId;
     online.clientId = message.clientId;
     online.creatorId = message.creatorId || message.clientId;
@@ -3027,6 +3112,7 @@ function handleSocketMessage(message) {
       return;
     }
     online.pendingRole = "";
+    cancelReconnect();
     online.roomId = message.roomId;
     online.clientId = message.clientId;
     online.creatorId = message.creatorId || online.creatorId;
@@ -3036,6 +3122,21 @@ function handleSocketMessage(message) {
     postMiniProgramRoom(online.roomId);
     updateOnlineStatus("已加入，等待房主同步牌局");
     setJoining(true, "已加入房间", "等待房主同步牌局...");
+    return;
+  }
+  if (message.type === "rejoined") {
+    online.pendingRole = "";
+    cancelReconnect();
+    online.roomId = message.roomId;
+    online.clientId = message.clientId;
+    online.creatorId = message.creatorId || online.creatorId;
+    online.connected = true;
+    online.seat = Number.isFinite(Number(message.seat)) ? Number(message.seat) : online.seat;
+    online.isHost = !!online.clientId && online.clientId === online.creatorId;
+    postMiniProgramRoom(online.roomId);
+    setJoining(false);
+    updateOnlineStatus("已重新进入牌局");
+    render();
     return;
   }
   if (message.type === "roomState") {

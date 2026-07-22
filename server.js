@@ -7,7 +7,8 @@ const root = __dirname;
 const uploadRoot = path.join(root, "uploads");
 const rooms = new Map();
 const startedAt = Date.now();
-const version = "2026-07-21-central-room-v1";
+const version = "2026-07-22-reconnect-host-lock-v1";
+const ROOM_IDLE_TTL_MS = 10 * 60 * 1000;
 
 const server = http.createServer((req, res) => {
   const urlPath = decodeURIComponent(req.url.split("?")[0]);
@@ -198,8 +199,16 @@ function handleMessage(client, message) {
     joinRoom(client, message);
     return;
   }
+  if (message.type === "rejoin") {
+    rejoinRoom(client, message);
+    return;
+  }
   const room = rooms.get(client.roomId);
   if (!room) return;
+  if (message.type === "stateSnapshot") {
+    storeRoomSnapshot(room, client, message.payload || {});
+    return;
+  }
   if (message.type === "action") {
     handleRoomAction(room, client, message);
     return;
@@ -226,11 +235,15 @@ function createRoom(client, message) {
     clients: new Map([[client.id, client]]),
     seats: Array.from({ length: 5 }, () => null),
     voiceActiveUntil: new Map(),
-    createdAt: Date.now()
+    createdAt: Date.now(),
+    emptySince: null,
+    cleanupTimer: null,
+    snapshot: null
   };
   rooms.set(roomId, room);
   client.roomId = roomId;
   client.seat = 0;
+  client.sessionId = String(message.sessionId || "");
   room.seats[0] = humanSeat(client, 0, message.name || "房主", message.avatarUrl || "");
   send(client, { type: "created", roomId, clientId: client.id, seat: 0, creatorId: room.creatorId });
   broadcastRoomState(room);
@@ -253,11 +266,65 @@ function joinRoom(client, message) {
     return;
   }
   room.clients.set(client.id, client);
+  room.emptySince = null;
+  clearRoomCleanup(room);
   client.roomId = room.id;
   client.seat = seat;
+  client.sessionId = String(message.sessionId || "");
   room.seats[seat] = humanSeat(client, seat, message.name || `玩家 ${seat}`, message.avatarUrl || "");
   send(client, { type: "joined", roomId: room.id, clientId: client.id, seat, creatorId: room.creatorId });
   broadcastRoomState(room);
+  sendRoomSnapshot(room, client);
+}
+
+function rejoinRoom(client, message) {
+  const roomId = String(message.roomId || "").trim().toUpperCase();
+  const room = rooms.get(roomId);
+  if (!room) {
+    send(client, { type: "error", message: "room expired" });
+    return;
+  }
+  const sessionId = String(message.sessionId || "");
+  const fallbackName = cleanName(message.name, "player");
+  const preferred = Number(message.seat);
+  let seatIndex = null;
+  if (preferred >= 0 && preferred <= 4) {
+    const preferredSeat = room.seats[preferred];
+    if (preferredSeat && preferredSeat.human && !preferredSeat.connected) {
+      if (!preferredSeat.sessionId || preferredSeat.sessionId === sessionId || preferredSeat.name === fallbackName) {
+        seatIndex = preferred;
+      }
+    }
+  }
+  if (seatIndex === null && sessionId) {
+    const found = room.seats.findIndex(seat => seat && seat.human && !seat.connected && seat.sessionId === sessionId);
+    if (found >= 0) seatIndex = found;
+  }
+  if (seatIndex === null) seatIndex = firstOpenSeat(room, preferred);
+  if (seatIndex === null) {
+    send(client, { type: "error", message: "room is full" });
+    return;
+  }
+
+  const oldSeat = room.seats[seatIndex] || {};
+  room.clients.set(client.id, client);
+  room.emptySince = null;
+  clearRoomCleanup(room);
+  client.roomId = room.id;
+  client.seat = seatIndex;
+  client.sessionId = sessionId || oldSeat.sessionId || "";
+  room.seats[seatIndex] = humanSeat(
+    client,
+    seatIndex,
+    message.name || oldSeat.name || `player ${seatIndex}`,
+    message.avatarUrl || oldSeat.avatarUrl || ""
+  );
+  room.seats[seatIndex].ready = !!oldSeat.ready;
+  if (seatIndex === 0) room.creatorId = client.id;
+
+  send(client, { type: "rejoined", roomId: room.id, clientId: client.id, seat: seatIndex, creatorId: room.creatorId });
+  broadcastRoomState(room);
+  sendRoomSnapshot(room, client);
 }
 
 function handleRoomAction(room, client, message) {
@@ -334,20 +401,37 @@ function relayLegacyGameMessage(room, client, message) {
   broadcast(room, message.payload, client);
 }
 
+function storeRoomSnapshot(room, client, payload) {
+  if (client.id !== room.creatorId) return;
+  if (!payload || payload.type !== "snapshot" || !payload.state) return;
+  room.snapshot = {
+    type: "snapshot",
+    state: payload.state,
+    roomId: room.id,
+    waitingRoom: !!payload.waitingRoom,
+    readySeats: payload.readySeats || {},
+    updatedAt: Date.now()
+  };
+}
+
+function sendRoomSnapshot(room, client) {
+  if (!room.snapshot) return;
+  send(client, { ...room.snapshot, seat: client.seat, roomId: room.id });
+}
+
 function leave(client) {
   const room = rooms.get(client.roomId);
   if (!room) return;
   room.clients.delete(client.id);
   if (client.seat !== null && room.seats[client.seat] && room.seats[client.seat].clientId === client.id) {
-    room.seats[client.seat] = null;
+    room.seats[client.seat].clientId = "";
+    room.seats[client.seat].connected = false;
+    room.seats[client.seat].lastSeen = Date.now();
   }
   if (room.clients.size === 0) {
-    rooms.delete(room.id);
+    room.emptySince = Date.now();
+    scheduleRoomCleanup(room);
   } else {
-    if (room.creatorId === client.id) {
-      const next = [...room.clients.values()][0];
-      room.creatorId = next.id;
-    }
     broadcastRoomState(room);
   }
   client.roomId = null;
@@ -362,7 +446,10 @@ function humanSeat(client, seat, name, avatarUrl) {
     bot: false,
     name: cleanName(name, seat === 0 ? "房主" : `玩家 ${seat}`),
     avatarUrl: cleanAvatarUrl(avatarUrl),
-    ready: false
+    ready: false,
+    sessionId: String(client.sessionId || ""),
+    connected: true,
+    lastSeen: 0
   };
 }
 
@@ -389,7 +476,8 @@ function broadcastRoomState(room) {
         bot: !!seat.bot,
         name: seat.name,
         avatarUrl: seat.avatarUrl,
-        ready: !!seat.ready
+        ready: !!seat.ready,
+        connected: seat.connected !== false
       })
     });
   }
@@ -404,6 +492,21 @@ function broadcast(room, message, except = null) {
   for (const peer of room.clients.values()) {
     if (peer !== except) send(peer, message);
   }
+}
+
+function scheduleRoomCleanup(room) {
+  clearRoomCleanup(room);
+  room.cleanupTimer = setTimeout(() => {
+    const latest = rooms.get(room.id);
+    if (!latest || latest.clients.size > 0) return;
+    if (latest.emptySince && Date.now() - latest.emptySince >= ROOM_IDLE_TTL_MS) rooms.delete(latest.id);
+  }, ROOM_IDLE_TTL_MS + 1000);
+}
+
+function clearRoomCleanup(room) {
+  if (!room.cleanupTimer) return;
+  clearTimeout(room.cleanupTimer);
+  room.cleanupTimer = null;
 }
 
 function send(client, message) {

@@ -1312,17 +1312,21 @@ function playCardSfx() {
 function playInteractionSfx(kind) {
   startAudioOnce();
   if (kind === "tea") {
-    tone(420, 0.08, 0.035, "sine");
-    tone(640, 0.12, 0.025, "triangle", 0.09);
+    tone(460, 0.06, 0.025, "sine");
+    playNoise(0.18, 0.035, 0.5);
+    tone(640, 0.12, 0.025, "triangle", 0.58);
     return;
   }
   if (kind === "egg") {
-    playNoise(0.18, 0.075);
-    tone(120, 0.12, 0.035, "sawtooth", 0.04);
+    tone(520, 0.04, 0.018, "triangle");
+    playNoise(0.12, 0.06, 0.54);
+    tone(980, 0.045, 0.035, "square", 0.55);
+    tone(620, 0.05, 0.03, "triangle", 0.61);
     return;
   }
-  tone(780, 0.055, 0.04, "square");
-  playNoise(0.11, 0.065, 0.03);
+  tone(720, 0.05, 0.026, "triangle");
+  playNoise(0.16, 0.095, 0.56);
+  tone(150, 0.09, 0.055, "sawtooth", 0.58);
 }
 
 function playVoicePresetSfx(kind) {
@@ -1497,15 +1501,55 @@ function closeFloatingSocialMenus() {
 
 function showInteractionAnimation(effect) {
   const item = socialLabels[effect.kind] || socialLabels.tomato;
-  const target = document.querySelector(`.seat[data-seat="${effect.to}"]`) || document.querySelector(`.seat${relativeSeatIndex(effect.to)}`);
-  const rect = target ? target.getBoundingClientRect() : { left: window.innerWidth / 2, top: window.innerHeight / 2, width: 1, height: 1 };
+  const from = seatEffectPoint(effect.from);
+  const to = seatEffectPoint(effect.to);
   const fly = document.createElement("div");
-  fly.className = `socialEffect socialEffect-${effect.kind}`;
+  fly.className = `socialProjectile socialProjectile-${effect.kind}`;
   fly.textContent = item.icon;
-  fly.style.left = `${rect.left + rect.width / 2}px`;
-  fly.style.top = `${rect.top + rect.height / 2}px`;
+  fly.style.left = `${from.x}px`;
+  fly.style.top = `${from.y}px`;
   document.body.appendChild(fly);
-  setTimeout(() => fly.remove(), 1400);
+  requestAnimationFrame(() => {
+    fly.classList.add("socialProjectileFlying");
+    fly.style.left = `${to.x}px`;
+    fly.style.top = `${to.y}px`;
+  });
+  setTimeout(() => showInteractionImpact(effect.kind, item, to), 610);
+  setTimeout(() => fly.remove(), 880);
+}
+
+function seatEffectPoint(seat) {
+  const rel = relativeSeatIndex(seat);
+  const target =
+    document.querySelector(`.seat[data-seat="${seat}"] .seatAvatar`) ||
+    document.querySelector(`.seat[data-seat="${seat}"]`) ||
+    document.querySelector(`.seat${rel} .seatAvatar`) ||
+    document.querySelector(`.seat${rel}`);
+  if (!target) return { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+  const rect = target.getBoundingClientRect();
+  return {
+    x: rect.left + rect.width / 2,
+    y: rect.top + rect.height / 2
+  };
+}
+
+function showInteractionImpact(kind, item, point) {
+  const impact = document.createElement("div");
+  const count = kind === "tea" ? 6 : kind === "egg" ? 9 : 10;
+  impact.className = `socialImpact socialImpact-${kind}`;
+  impact.style.left = `${point.x}px`;
+  impact.style.top = `${point.y}px`;
+  const pieces = Array.from({ length: count }, (_, index) => {
+    const angle = (Math.PI * 2 * index) / count + Math.random() * 0.45;
+    const distance = 18 + Math.random() * (kind === "tomato" ? 48 : 36);
+    const x = Math.cos(angle) * distance;
+    const y = Math.sin(angle) * distance;
+    const rotate = Math.round(Math.random() * 180 - 90);
+    return `<i style="--x:${x.toFixed(1)}px;--y:${y.toFixed(1)}px;--r:${rotate}deg"></i>`;
+  }).join("");
+  impact.innerHTML = `<b>${item.icon}</b>${pieces}`;
+  document.body.appendChild(impact);
+  setTimeout(() => impact.remove(), 980);
 }
 
 function showVoiceBubble(effect) {

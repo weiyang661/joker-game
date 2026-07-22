@@ -7,7 +7,7 @@ const root = __dirname;
 const uploadRoot = path.join(root, "uploads");
 const rooms = new Map();
 const startedAt = Date.now();
-const version = "2026-07-22-fixed-seat-host-v2";
+const version = "2026-07-22-room-snapshot-sync-v1";
 const ROOM_IDLE_TTL_MS = 10 * 60 * 1000;
 
 const server = http.createServer((req, res) => {
@@ -209,6 +209,10 @@ function handleMessage(client, message) {
     storeRoomSnapshot(room, client, message.payload || {});
     return;
   }
+  if (message.type === "requestSnapshot") {
+    sendRoomSnapshot(room, client);
+    return;
+  }
   if (message.type === "action") {
     handleRoomAction(room, client, message);
     return;
@@ -240,7 +244,8 @@ function createRoom(client, message) {
     createdAt: Date.now(),
     emptySince: null,
     cleanupTimer: null,
-    snapshot: null
+    snapshot: null,
+    started: false
   };
   rooms.set(roomId, room);
   client.roomId = roomId;
@@ -413,19 +418,30 @@ function relayLegacyGameMessage(room, client, message) {
 function storeRoomSnapshot(room, client, payload) {
   if (client.id !== room.creatorId) return;
   if (!payload || payload.type !== "snapshot" || !payload.state) return;
+  room.started = !!payload.roomStarted || !payload.waitingRoom;
   room.snapshot = {
     type: "snapshot",
     state: payload.state,
     roomId: room.id,
-    waitingRoom: !!payload.waitingRoom,
+    waitingRoom: !!payload.waitingRoom && !room.started,
+    roomStarted: room.started,
     readySeats: payload.readySeats || {},
     updatedAt: Date.now()
   };
+  broadcastRoomState(room);
+  broadcastStoredSnapshot(room);
 }
 
 function sendRoomSnapshot(room, client) {
   if (!room.snapshot) return;
   send(client, { ...room.snapshot, seat: client.seat, roomId: room.id });
+}
+
+function broadcastStoredSnapshot(room) {
+  if (!room.snapshot) return;
+  for (const client of room.clients.values()) {
+    sendRoomSnapshot(room, client);
+  }
 }
 
 function leave(client) {
@@ -478,6 +494,8 @@ function broadcastRoomState(room) {
       clientId: client.id,
       seat: client.seat,
       creatorId: room.creatorId,
+      started: !!room.started,
+      hasSnapshot: !!room.snapshot,
       seats: room.seats.map(seat => seat && {
         seat: seat.seat,
         clientId: seat.clientId,

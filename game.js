@@ -152,6 +152,8 @@ const online = {
   pendingSnapshot: null,
   connectionPromise: null,
   pendingRole: "",
+  roomStarted: false,
+  snapshotRequestedAt: 0,
   reconnectTimer: null,
   reconnectAttempts: 0
 };
@@ -354,8 +356,40 @@ function makeLobbyPlayer(index, name, profiles = {}) {
 }
 
 function isWaitingRoomView() {
+  if (online.roomStarted) return false;
   const noCardsDealt = state.players.every(player => !player.hand || player.hand.length === 0);
-  return !!(online.roomId && noCardsDealt && (online.waitingRoom || (!state.hasPlayed && !state.revealPhase)));
+  return !!(online.roomId && noCardsDealt && (
+    online.waitingRoom ||
+    (!state.hasPlayed && !state.revealPhase && !state.roundSettled && !state.lastSettlement.length)
+  ));
+}
+
+function hasAnyCardsDealt() {
+  return state.players.some(player => player.hand && player.hand.length > 0);
+}
+
+function normalizeOnlineLobbyState() {
+  if (!online.roomId || hasAnyCardsDealt()) return;
+  if (online.roomStarted) {
+    online.waitingRoom = false;
+    state.gameOver = false;
+    state.continuingForNextLead = false;
+    if (!state.tableNotice || isFinalSettlementNotice(state.tableNotice) || state.tableNotice === "等待玩家加入并准备") {
+      state.tableNotice = "正在同步牌局，请稍候或点击重新连接";
+    }
+    requestRoomSnapshot();
+    return;
+  }
+  if (state.roundSettled || state.lastSettlement.length) return;
+  if (online.waitingRoom || (!state.hasPlayed && !state.revealPhase)) {
+    online.waitingRoom = true;
+    state.gameOver = false;
+    state.continuingForNextLead = false;
+    state.pendingSnowChoice = null;
+    if (!state.tableNotice || isFinalSettlementNotice(state.tableNotice)) {
+      state.tableNotice = "等待玩家加入并准备";
+    }
+  }
 }
 
 function isSeatHumanInWaiting(index) {
@@ -374,6 +408,7 @@ function isWaitingEmptySeat(player, index) {
 }
 
 function setupWaitingRoom(options = {}) {
+  online.roomStarted = false;
   if (options.resetMatch) {
     state.playerMatch = [0, 0, 0, 0, 0];
     state.firstFinisherNext = 0;
@@ -393,7 +428,7 @@ function setupWaitingRoom(options = {}) {
   state.trickPoints = 0;
   state.scores = { king: 0, plain: 0 };
   state.finishedOrder = [];
-  state.gameOver = true;
+  state.gameOver = false;
   state.continuingForNextLead = false;
   state.hasPlayed = false;
   state.revealPhase = false;
@@ -422,6 +457,13 @@ function humanSeatsInRoom() {
 function allJoinedPlayersReady() {
   const seats = humanSeatsInRoom();
   return seats.length > 0 && seats.every(seat => online.readySeats[seat]);
+}
+
+function canStartWaitingRoom() {
+  if (!online.connected || !online.isHost || !isWaitingRoomView()) return false;
+  const seats = humanSeatsInRoom();
+  if (!seats.length) return false;
+  return seats.every(seat => seat === localSeat() || online.readySeats[seat]);
 }
 
 function setSeatReady(seat, ready) {
@@ -469,7 +511,10 @@ function startGame(options = {}) {
     state.playerMatch = [0, 0, 0, 0, 0];
     state.firstFinisherNext = 0;
   }
-  if (online.roomId) online.waitingRoom = false;
+  if (online.roomId) {
+    online.waitingRoom = false;
+    online.hasSnapshot = true;
+  }
   const preservedProfiles = { ...preservedOnlineProfiles(), ...(options.preserveProfiles || {}) };
   const preservedNames = { ...preservedOnlineNames(), ...(options.preserveNames || {}) };
   Object.keys(preservedNames).forEach(seat => {
@@ -1066,7 +1111,7 @@ function endRound(message, winnerTeam = null, multiplier = 1) {
   if (state.gameOver) return;
   state.pendingSnowChoice = null;
   state.snowChasingTeam = null;
-  state.gameOver = true;
+  state.gameOver = false;
   state.tableNotice = message;
   addLog(message);
   if (winnerTeam) settleRound(winnerTeam, multiplier);
@@ -1148,6 +1193,7 @@ function removeCards(hand, cards) {
 
 function maybeBotTurn() {
   if (!isHostRuntime()) return;
+  if (isWaitingRoomView() || !hasAnyCardsDealt()) return;
   if (state.revealPhase) return;
   if (state.pendingSnowChoice) {
     const hasHumanWinner = unfinishedTeamPlayers(state.pendingSnowChoice.winnerTeam)
@@ -1772,6 +1818,7 @@ function showVoiceBubble(effect) {
 }
 
 function render() {
+  normalizeOnlineLobbyState();
   ensureSettlementOverlayInBody();
   ensureSocialControls();
   updateActionVisibility();
@@ -1837,9 +1884,11 @@ function renderWaitingDock() {
 
 function renderWaitingDock() {
   const dock = ensureWaitingDock();
+  normalizeOnlineLobbyState();
   const waitingView = isWaitingRoomView();
   const socketOpen = online.socket && online.socket.readyState === WebSocket.OPEN;
-  const show = waitingView || (!!online.roomId && !socketOpen);
+  const syncingStartedRoom = online.roomStarted && !!online.roomId && !hasAnyCardsDealt();
+  const show = waitingView || syncingStartedRoom || (!!online.roomId && !socketOpen);
   document.body.dataset.waitingRoom = show ? "true" : "false";
   if (!show) {
     dock.hidden = true;
@@ -1847,13 +1896,16 @@ function renderWaitingDock() {
     return;
   }
   const ready = !!online.readySeats[localSeat()];
-  const canStart = online.connected && online.isHost && allJoinedPlayersReady();
-  const reconnect = socketOpen ? "" : `
+  const canStart = canStartWaitingRoom();
+  const invite = online.isHost && online.roomId ? `
+    <button class="waitingDockBtn secondary" type="button" data-waiting-dock-action="invite">邀请好友</button>` : "";
+  const reconnect = socketOpen && !syncingStartedRoom ? "" : `
     <button class="waitingDockBtn secondary" type="button" data-waiting-dock-action="reconnect">重新连接</button>`;
   const start = online.isHost ? `
     <button class="waitingDockBtn primary" type="button" data-waiting-dock-action="start" ${canStart ? "" : "disabled"}>开始本局</button>` : "";
   dock.hidden = false;
   dock.innerHTML = `
+    ${invite}
     <button class="waitingDockBtn primary" type="button" data-waiting-dock-action="ready" ${online.connected ? "" : "disabled"}>${ready ? "取消准备" : "准备"}</button>
     ${start}
     ${reconnect}`;
@@ -1947,27 +1999,32 @@ function scheduleSnapshotApply(message) {
 function applySnapshot(message) {
   const previousSeat = online.seat;
   loadState(message.state);
+  const snapshotHasCards = hasAnyCardsDealt();
   online.seat = message.seat;
   online.roomId = message.roomId || online.roomId;
-  online.waitingRoom = !!message.waitingRoom;
+  online.roomStarted = !!message.roomStarted || (!message.waitingRoom && snapshotHasCards);
+  online.waitingRoom = !!message.waitingRoom && !online.roomStarted;
   online.readySeats = message.readySeats || {};
   online.hasSnapshot = true;
   if (state.players[online.seat] && !el.nameInput.value.trim()) el.nameInput.value = state.players[online.seat].name;
   if (previousSeat && previousSeat !== online.seat) {
     state.tableNotice = `你选择的座位已占用，已自动进入座位 ${online.seat}`;
   }
+  normalizeOnlineLobbyState();
   setJoining(false);
   render();
   updateOnlineStatus();
 }
 
 function applyRoomState(message) {
+  const alreadyDealt = hasAnyCardsDealt();
   online.roomId = message.roomId || online.roomId;
   online.clientId = message.clientId || online.clientId;
   online.creatorId = message.creatorId || online.creatorId;
   if (Number.isFinite(Number(message.seat))) online.seat = Number(message.seat);
   online.isHost = !!online.clientId && online.clientId === online.creatorId;
   online.connected = true;
+  online.roomStarted = !!message.started || online.roomStarted;
   cancelReconnect();
 
   online.seatClients = {};
@@ -1985,7 +2042,10 @@ function applyRoomState(message) {
     if (seatInfo.ready) online.readySeats[index] = true;
   });
 
-  if (!online.hasSnapshot || !state.players.length) {
+  if (online.roomStarted && !alreadyDealt) {
+    online.waitingRoom = false;
+    requestRoomSnapshot();
+  } else if (!alreadyDealt && (!online.hasSnapshot || !state.players.length)) {
     setupWaitingRoom({ preserveProfiles: profiles });
     online.hasSnapshot = true;
   }
@@ -2003,11 +2063,14 @@ function applyRoomState(message) {
       return;
     }
     player.name = seatInfo.name || (index === 0 ? "房主" : `玩家 ${index}`);
-    player.avatarUrl = cleanAvatarUrl(seatInfo.avatarUrl);
-    player.human = !!seatInfo.human;
-    player.botFilled = !!seatInfo.bot;
+    player.avatarUrl = cleanAvatarUrl(seatInfo.avatarUrl) || player.avatarUrl || "";
+    if (!alreadyDealt) {
+      player.human = !!seatInfo.human;
+      player.botFilled = !!seatInfo.bot;
+    }
   });
 
+  normalizeOnlineLobbyState();
   setJoining(false);
   render();
   updateOnlineStatus();
@@ -2015,13 +2078,17 @@ function applyRoomState(message) {
 
 function broadcastSnapshot() {
   if (!online.connected || !online.isHost || !online.socket || online.socket.readyState !== WebSocket.OPEN) return;
+  const waitingRoom = isWaitingRoomView();
+  const roomStarted = online.roomStarted || !waitingRoom;
+  const snapshotState = serializeState();
   sendSocket({
     type: "stateSnapshot",
     payload: {
       type: "snapshot",
-      state: serializeState(),
+      state: snapshotState,
       roomId: online.roomId,
-      waitingRoom: isWaitingRoomView(),
+      waitingRoom,
+      roomStarted,
       readySeats: online.readySeats
     }
   });
@@ -2032,10 +2099,11 @@ function broadcastSnapshot() {
       to: clientId,
       payload: {
         type: "snapshot",
-        state: serializeState(),
+        state: snapshotState,
         seat: Number(seat),
         roomId: online.roomId,
-        waitingRoom: isWaitingRoomView(),
+        waitingRoom,
+        roomStarted,
         readySeats: online.readySeats
       }
     });
@@ -2050,6 +2118,14 @@ function sendSocket(message) {
   }
   if (online.roomId) scheduleReconnect();
   return false;
+}
+
+function requestRoomSnapshot() {
+  if (!online.connected || !online.roomId) return;
+  const now = Date.now();
+  if (now - online.snapshotRequestedAt < 1200) return;
+  online.snapshotRequestedAt = now;
+  sendSocket({ type: "requestSnapshot" });
 }
 
 function cancelReconnect() {
@@ -2643,7 +2719,7 @@ function renderPanels() {
   if (online.connected && !online.isHost) el.nextRoundBtn.disabled = true;
   el.readyBtn.disabled = !online.connected || !waitingView;
   el.readyBtn.textContent = online.readySeats[localSeat()] ? "取消准备" : "准备";
-  el.startOnlineBtn.disabled = !online.connected || !online.isHost || !waitingView || !allJoinedPlayersReady();
+  el.startOnlineBtn.disabled = !canStartWaitingRoom();
   if (el.inviteBtn) el.inviteBtn.disabled = !online.connected || !online.isHost || !online.roomId;
   if (el.hostBtn) el.hostBtn.disabled = online.joining || isOnlineRoomMember();
   if (el.joinBtn) el.joinBtn.disabled = online.joining || isOnlineRoomMember();
@@ -3019,19 +3095,26 @@ el.settlementNextBtn && el.settlementNextBtn.addEventListener("click", () => {
 
 el.startOnlineBtn.addEventListener("click", () => {
   if (!online.connected || !online.isHost) return;
-  online.waitingRoom = true;
-  if (!allJoinedPlayersReady()) {
+  normalizeOnlineLobbyState();
+  if (!canStartWaitingRoom()) {
     state.tableNotice = "还有玩家未准备，不能开始";
     render();
     return;
   }
+  online.readySeats[localSeat()] = true;
   fillEmptySeatsWithBots();
   online.waitingRoom = false;
+  online.roomStarted = true;
+  online.hasSnapshot = true;
+  state.gameOver = false;
   startGame({ preserveNames: preservedOnlineNames() });
   broadcastSnapshot();
+  setTimeout(() => broadcastSnapshot(), 200);
+  setTimeout(() => broadcastSnapshot(), 800);
 });
 
 el.readyBtn.addEventListener("click", () => {
+  normalizeOnlineLobbyState();
   if (!online.connected || !isWaitingRoomView()) return;
   online.waitingRoom = true;
   const seat = localSeat();

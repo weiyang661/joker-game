@@ -140,7 +140,9 @@ const audioState = {
   ctx: null,
   enabled: false,
   musicTimer: null,
-  beat: 0
+  beat: 0,
+  voiceCache: new Map(),
+  voiceWarmed: false
 };
 const seenSocialEffects = new Set();
 const socialLabels = {
@@ -1327,13 +1329,38 @@ function playVoicePresetSfx(kind) {
   startAudioOnce();
   const preset = voicePresets[kind];
   if (preset && preset.file) {
-    playVoiceAudioSources([
-      `音频/${preset.file}`,
-      preset.file
-    ], preset.label);
+    playVoiceAudioSources(voiceFileSources(preset.file), preset.label);
     return;
   }
   console.warn("语音不存在", kind);
+}
+
+function voiceFileSources(file) {
+  return [
+    file,
+    `音频/${file}`,
+    encodeURI(file),
+    `音频/${encodeURI(file)}`
+  ];
+}
+
+function getVoiceAudio(src) {
+  if (!audioState.voiceCache.has(src)) {
+    const audio = new Audio(src);
+    audio.preload = "auto";
+    audio.volume = 0.95;
+    audio.load();
+    audioState.voiceCache.set(src, audio);
+  }
+  return audioState.voiceCache.get(src);
+}
+
+function warmVoiceAudioCache() {
+  if (audioState.voiceWarmed) return;
+  audioState.voiceWarmed = true;
+  Object.values(voicePresets).forEach(preset => {
+    voiceFileSources(preset.file).forEach(src => getVoiceAudio(src));
+  });
 }
 
 function playVoiceAudioSources(sources, label, index = 0) {
@@ -1342,8 +1369,8 @@ function playVoiceAudioSources(sources, label, index = 0) {
     console.warn("语音播放失败：所有路径都无法播放", label);
     return;
   }
-  const audio = new Audio(src);
-  audio.preload = "auto";
+  const cached = getVoiceAudio(src);
+  const audio = cached.cloneNode(true);
   audio.volume = 0.95;
   audio.play().catch(() => playVoiceAudioSources(sources, label, index + 1));
 }
@@ -1394,6 +1421,7 @@ function ensureSocialControls() {
     button.textContent = "语音";
     button.addEventListener("click", event => {
       startAudioOnce();
+      warmVoiceAudioCache();
       showVoiceMenu(event);
     });
     document.body.appendChild(button);

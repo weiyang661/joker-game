@@ -926,6 +926,41 @@ body[data-invite-join="true"] .inviteJoinDialog {
   font-size: 14px;
 }
 
+.waitingActions {
+  margin-top: 14px;
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.waitingBtn {
+  min-width: 120px;
+  min-height: 42px;
+  padding: 8px 20px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,.22);
+  background: rgba(18, 31, 36, .82);
+  color: #fff8df;
+  font-size: 18px;
+  font-weight: 900;
+  box-shadow: 0 10px 24px rgba(0,0,0,.25);
+}
+
+.waitingBtn.primary {
+  background: linear-gradient(#f0bd55, #bd7627);
+  border-color: #f1cf7c;
+}
+
+.waitingBtn.secondary {
+  background: rgba(22, 42, 49, .9);
+}
+
+.waitingBtn:disabled,
+.waitingBtn.disabled {
+  opacity: .46;
+}
+
 .centerPlay {
   display: flex;
   flex-wrap: wrap;
@@ -2634,6 +2669,27 @@ body[data-miniapp="true"] .tableCenter .centerNotice {
 body[data-miniapp="true"] .tableCenter .centerLine {
   flex: 0 1 auto;
   color: rgba(248, 241, 223, .86);
+}
+
+body[data-miniapp="true"] .tableCenter.waitingCenter,
+body[data-miniapp="true"] .tableCenter:has(.waitingActions) {
+  width: min(520px, 46vw);
+  padding: 8px 12px;
+}
+
+body[data-miniapp="true"] .waitingActions {
+  width: 100%;
+  margin-top: 8px;
+  gap: 8px;
+}
+
+body[data-miniapp="true"] .waitingBtn {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: clamp(30px, 6vh, 40px);
+  padding: 4px 10px;
+  border-radius: 10px;
+  font-size: clamp(13px, 3vh, 17px);
 }
 
 body[data-miniapp="true"] .trickScoreBadge {

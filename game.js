@@ -1802,7 +1802,7 @@ function applyRoomState(message) {
   online.clientId = message.clientId || online.clientId;
   online.creatorId = message.creatorId || online.creatorId;
   if (Number.isFinite(Number(message.seat))) online.seat = Number(message.seat);
-  online.isHost = !!online.clientId && online.clientId === online.creatorId;
+  online.isHost = (!!online.clientId && online.clientId === online.creatorId) || online.seat === 0;
   online.connected = true;
   cancelReconnect();
 
@@ -1928,18 +1928,34 @@ async function rejoinCurrentRoom() {
 }
 
 function renderTableCenter() {
-  if (online.connected && online.waitingRoom) {
+  if (online.waitingRoom) {
+    el.tableCenter.classList.add("waitingCenter");
     const readyLine = humanSeatsInRoom()
       .map(seat => `${(state.players[seat] && state.players[seat].name) || `玩家 ${seat}`}：${online.readySeats[seat] ? "已准备" : "未准备"}`)
       .join("　");
+    const ready = !!online.readySeats[localSeat()];
+    const canStart = online.connected && online.isHost && allJoinedPlayersReady();
+    const hostHint = online.isHost ? "房主可在所有真人准备后开始，不足五人会自动补入人机。" : "等待房主开始本局。";
+    const reconnect = !online.connected && online.roomId
+      ? `<button class="waitingBtn secondary" type="button" data-waiting-reconnect>重新连接</button>`
+      : "";
+    const start = online.isHost
+      ? `<button class="waitingBtn ${canStart ? "primary" : "disabled"}" type="button" data-waiting-start ${canStart ? "" : "disabled"}>开始本局</button>`
+      : "";
     el.tableCenter.innerHTML = `
       <div class="phasePill">房间准备</div>
       <div class="centerNotice">${state.tableNotice || "等待玩家准备"}</div>
       <div class="centerLine">${readyLine || "等待玩家加入"}</div>
-      <div class="centerLine">所有已入房真人准备后，房主才能开始发牌。</div>
+      <div class="centerLine">${hostHint}</div>
+      <div class="waitingActions">
+        <button class="waitingBtn primary" type="button" data-waiting-ready ${online.connected ? "" : "disabled"}>${ready ? "取消准备" : "准备"}</button>
+        ${start}
+        ${reconnect}
+      </div>
     `;
     return;
   }
+  el.tableCenter.classList.remove("waitingCenter");
   const player = state.players[state.current];
   const phase = state.revealPhase
     ? "亮王阶段"
@@ -2812,6 +2828,21 @@ el.joinBtn.addEventListener("click", () => {
 
 el.table.addEventListener("click", event => {
   startAudioOnce();
+  const waitingReady = event.target.closest("[data-waiting-ready]");
+  if (waitingReady) {
+    el.readyBtn.click();
+    return;
+  }
+  const waitingStart = event.target.closest("[data-waiting-start]");
+  if (waitingStart) {
+    el.startOnlineBtn.click();
+    return;
+  }
+  const waitingReconnect = event.target.closest("[data-waiting-reconnect]");
+  if (waitingReconnect) {
+    rejoinCurrentRoom();
+    return;
+  }
   const invite = event.target.closest(".seatInviteBtn");
   if (invite) {
     const seat = Number(invite.dataset.seat);
@@ -3132,7 +3163,7 @@ function handleSocketMessage(message) {
     online.creatorId = message.creatorId || online.creatorId;
     online.connected = true;
     online.seat = Number.isFinite(Number(message.seat)) ? Number(message.seat) : online.seat;
-    online.isHost = !!online.clientId && online.clientId === online.creatorId;
+    online.isHost = (!!online.clientId && online.clientId === online.creatorId) || online.seat === 0;
     postMiniProgramRoom(online.roomId);
     setJoining(false);
     updateOnlineStatus("已重新进入牌局");

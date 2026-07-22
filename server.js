@@ -7,7 +7,7 @@ const root = __dirname;
 const uploadRoot = path.join(root, "uploads");
 const rooms = new Map();
 const startedAt = Date.now();
-const version = "2026-07-11-room-role-lock";
+const version = "2026-07-21-central-room-v1";
 
 const server = http.createServer((req, res) => {
   const urlPath = decodeURIComponent(req.url.split("?")[0]);
@@ -58,27 +58,28 @@ function handleAvatarUpload(req, res) {
       const data = JSON.parse(body || "{}");
       const match = String(data.image || "").match(/^data:image\/(png|jpe?g|webp);base64,([a-z0-9+/=]+)$/i);
       if (!match) {
-        res.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
-        res.end(JSON.stringify({ ok: false, message: "invalid image" }));
+        writeJson(res, 400, { ok: false, message: "invalid image" });
         return;
       }
       const ext = match[1].toLowerCase().replace("jpeg", "jpg");
       const buffer = Buffer.from(match[2], "base64");
       if (!buffer.length || buffer.length > 1024 * 1024) {
-        res.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
-        res.end(JSON.stringify({ ok: false, message: "image too large" }));
+        writeJson(res, 400, { ok: false, message: "image too large" });
         return;
       }
       fs.mkdirSync(uploadRoot, { recursive: true });
       const fileName = `${Date.now()}-${crypto.randomBytes(5).toString("hex")}.${ext}`;
       fs.writeFileSync(path.join(uploadRoot, fileName), buffer);
-      res.writeHead(200, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" });
-      res.end(JSON.stringify({ ok: true, avatarUrl: `/uploads/${fileName}` }));
+      writeJson(res, 200, { ok: true, avatarUrl: `/uploads/${fileName}` });
     } catch {
-      res.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
-      res.end(JSON.stringify({ ok: false, message: "bad request" }));
+      writeJson(res, 400, { ok: false, message: "bad request" });
     }
   });
+}
+
+function writeJson(res, status, body) {
+  res.writeHead(status, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" });
+  res.end(JSON.stringify(body));
 }
 
 server.on("upgrade", (req, socket) => {
@@ -100,7 +101,7 @@ server.on("upgrade", (req, socket) => {
     id: crypto.randomBytes(4).toString("hex"),
     socket,
     roomId: null,
-    host: false,
+    seat: null,
     buffer: Buffer.alloc(0),
     messageParts: []
   };
@@ -188,55 +189,202 @@ function handleTextPayload(client, payload) {
 
 function handleMessage(client, message) {
   if (message.type === "create") {
-    if (client.roomId) {
-      send(client, { type: "error", message: "你已经在房间中，刷新页面后才能重新开房" });
-      return;
-    }
-    leave(client);
-    const requestedRoomId = normalizeRequestedRoomId(message.roomId);
-    if (requestedRoomId && rooms.has(requestedRoomId)) {
-      send(client, { type: "error", message: "房号已被占用，请重新开房" });
-      return;
-    }
-    const roomId = requestedRoomId || newRoomId();
-    rooms.set(roomId, { host: client, clients: new Map([[client.id, client]]) });
-    client.roomId = roomId;
-    client.host = true;
-    send(client, { type: "created", roomId, clientId: client.id });
+    createRoom(client, message);
     return;
   }
   if (message.type === "join") {
-    if (client.roomId) {
-      send(client, { type: "error", message: "你已经在房间中，刷新页面后才能加入其他房间" });
-      return;
-    }
-    leave(client);
-    const room = rooms.get(String(message.roomId || "").toUpperCase());
-    if (!room) return send(client, { type: "error", message: "房间不存在" });
-    room.clients.set(client.id, client);
-    client.roomId = String(message.roomId).toUpperCase();
-    client.host = false;
-    send(client, { type: "joined", roomId: client.roomId, clientId: client.id });
-    send(room.host, { type: "joinRequest", clientId: client.id, seat: message.seat, name: message.name || "玩家", avatarUrl: message.avatarUrl || "" });
+    joinRoom(client, message);
     return;
   }
   const room = rooms.get(client.roomId);
   if (!room) return;
-  if (client.host) {
-    if (message.to) {
-      const target = room.clients.get(message.to);
-      if (target) send(target, message.payload);
-    } else {
-      for (const peer of room.clients.values()) {
-        if (peer !== client) send(peer, message.payload);
-      }
+  if (message.type === "action") {
+    handleRoomAction(room, client, message);
+    return;
+  }
+  if (message.type === "relay") {
+    relayLegacyGameMessage(room, client, message);
+  }
+}
+
+function createRoom(client, message) {
+  if (client.roomId) {
+    send(client, { type: "error", message: "你已经在房间中，刷新页面后才能重新开房" });
+    return;
+  }
+  const requestedRoomId = normalizeRequestedRoomId(message.roomId);
+  if (requestedRoomId && rooms.has(requestedRoomId)) {
+    send(client, { type: "error", message: "房号已被占用，请重新开房" });
+    return;
+  }
+  const roomId = requestedRoomId || newRoomId();
+  const room = {
+    id: roomId,
+    creatorId: client.id,
+    clients: new Map([[client.id, client]]),
+    seats: Array.from({ length: 5 }, () => null),
+    createdAt: Date.now()
+  };
+  rooms.set(roomId, room);
+  client.roomId = roomId;
+  client.seat = 0;
+  room.seats[0] = humanSeat(client, 0, message.name || "房主", message.avatarUrl || "");
+  send(client, { type: "created", roomId, clientId: client.id, seat: 0, creatorId: room.creatorId });
+  broadcastRoomState(room);
+}
+
+function joinRoom(client, message) {
+  if (client.roomId) {
+    send(client, { type: "error", message: "你已经在房间中，刷新页面后才能加入其他房间" });
+    return;
+  }
+  const roomId = String(message.roomId || "").trim().toUpperCase();
+  const room = rooms.get(roomId);
+  if (!room) {
+    send(client, { type: "error", message: "房间不存在" });
+    return;
+  }
+  const seat = firstOpenSeat(room, Number(message.seat));
+  if (seat === null) {
+    send(client, { type: "error", message: "房间已满" });
+    return;
+  }
+  room.clients.set(client.id, client);
+  client.roomId = room.id;
+  client.seat = seat;
+  room.seats[seat] = humanSeat(client, seat, message.name || `玩家 ${seat}`, message.avatarUrl || "");
+  send(client, { type: "joined", roomId: room.id, clientId: client.id, seat, creatorId: room.creatorId });
+  broadcastRoomState(room);
+}
+
+function handleRoomAction(room, client, message) {
+  const seatIndex = client.seat;
+  const seat = room.seats[seatIndex];
+  if (!seat) return;
+  if (message.action === "ready") {
+    seat.ready = !!message.ready;
+    broadcastRoomState(room);
+    return;
+  }
+  if (message.action === "rename") {
+    seat.name = cleanName(message.name, seatIndex === 0 ? "房主" : `玩家 ${seatIndex}`);
+    seat.avatarUrl = cleanAvatarUrl(message.avatarUrl);
+    broadcastRoomState(room);
+    return;
+  }
+  if (message.action === "fillBot") {
+    if (client.id !== room.creatorId) {
+      send(client, { type: "error", message: "只有创建房间的人可以填入人机" });
+      return;
     }
+    const targetSeat = Number(message.seat);
+    if (targetSeat < 1 || targetSeat > 4 || room.seats[targetSeat] && room.seats[targetSeat].human) return;
+    room.seats[targetSeat] = {
+      seat: targetSeat,
+      clientId: "",
+      human: false,
+      bot: true,
+      name: `人机 ${targetSeat}`,
+      avatarUrl: "",
+      ready: true
+    };
+    broadcastRoomState(room);
+    return;
+  }
+  if (message.action === "socialEffect") {
+    broadcast(room, { type: "socialEffect", effect: { ...(message.effect || {}), from: seatIndex } });
+    return;
+  }
+  sendCreator(room, { type: "clientMessage", clientId: client.id, payload: message });
+}
+
+function relayLegacyGameMessage(room, client, message) {
+  if (client.id !== room.creatorId) {
+    sendCreator(room, { type: "clientMessage", clientId: client.id, payload: message });
+    return;
+  }
+  if (message.to) {
+    const target = room.clients.get(message.to);
+    if (target) send(target, message.payload);
+    return;
+  }
+  broadcast(room, message.payload, client);
+}
+
+function leave(client) {
+  const room = rooms.get(client.roomId);
+  if (!room) return;
+  room.clients.delete(client.id);
+  if (client.seat !== null && room.seats[client.seat] && room.seats[client.seat].clientId === client.id) {
+    room.seats[client.seat] = null;
+  }
+  if (room.clients.size === 0) {
+    rooms.delete(room.id);
   } else {
-    send(room.host, { type: "clientMessage", clientId: client.id, payload: message });
+    if (room.creatorId === client.id) {
+      const next = [...room.clients.values()][0];
+      room.creatorId = next.id;
+    }
+    broadcastRoomState(room);
+  }
+  client.roomId = null;
+  client.seat = null;
+}
+
+function humanSeat(client, seat, name, avatarUrl) {
+  return {
+    seat,
+    clientId: client.id,
+    human: true,
+    bot: false,
+    name: cleanName(name, seat === 0 ? "房主" : `玩家 ${seat}`),
+    avatarUrl: cleanAvatarUrl(avatarUrl),
+    ready: false
+  };
+}
+
+function firstOpenSeat(room, preferred) {
+  if (preferred >= 0 && preferred <= 4 && !room.seats[preferred]) return preferred;
+  for (let seat = 1; seat <= 4; seat += 1) {
+    if (!room.seats[seat]) return seat;
+  }
+  return !room.seats[0] ? 0 : null;
+}
+
+function broadcastRoomState(room) {
+  for (const client of room.clients.values()) {
+    send(client, {
+      type: "roomState",
+      roomId: room.id,
+      clientId: client.id,
+      seat: client.seat,
+      creatorId: room.creatorId,
+      seats: room.seats.map(seat => seat && {
+        seat: seat.seat,
+        clientId: seat.clientId,
+        human: !!seat.human,
+        bot: !!seat.bot,
+        name: seat.name,
+        avatarUrl: seat.avatarUrl,
+        ready: !!seat.ready
+      })
+    });
+  }
+}
+
+function sendCreator(room, message) {
+  const creator = room.clients.get(room.creatorId);
+  if (creator) send(creator, message);
+}
+
+function broadcast(room, message, except = null) {
+  for (const peer of room.clients.values()) {
+    if (peer !== except) send(peer, message);
   }
 }
 
 function send(client, message) {
+  if (!client || client.socket.destroyed) return;
   const payload = Buffer.from(JSON.stringify(message), "utf8");
   sendFrame(client, payload, 1);
 }
@@ -256,16 +404,6 @@ function sendFrame(client, payload, opcode = 1) {
   client.socket.write(Buffer.concat([header, payload]));
 }
 
-function leave(client) {
-  const room = rooms.get(client.roomId);
-  if (!room) return;
-  room.clients.delete(client.id);
-  if (room.host === client || room.clients.size === 0) rooms.delete(client.roomId);
-  else send(room.host, { type: "peerLeft", clientId: client.id });
-  client.roomId = null;
-  client.host = false;
-}
-
 function newRoomId() {
   let id;
   do {
@@ -277,6 +415,18 @@ function newRoomId() {
 function normalizeRequestedRoomId(value) {
   const id = String(value || "").trim().toUpperCase();
   return /^[A-Z0-9]{6}$/.test(id) ? id : "";
+}
+
+function cleanName(name, fallback) {
+  return String(name || "").trim().slice(0, 10) || fallback;
+}
+
+function cleanAvatarUrl(value) {
+  const avatarUrl = String(value || "").trim();
+  if (!avatarUrl) return "";
+  if (avatarUrl.startsWith("/uploads/")) return avatarUrl;
+  if (/^https:\/\/[a-z0-9.-]+\/uploads\/[-a-z0-9._%]+$/i.test(avatarUrl)) return avatarUrl;
+  return "";
 }
 
 const port = Number(process.env.PORT || 8787);

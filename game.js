@@ -117,6 +117,7 @@ const online = {
   socket: null,
   roomId: "",
   clientId: "",
+  creatorId: "",
   seat: 0,
   seatClients: {},
   clientSeats: {},
@@ -1577,9 +1578,61 @@ function applySnapshot(message) {
   updateOnlineStatus();
 }
 
+function applyRoomState(message) {
+  online.roomId = message.roomId || online.roomId;
+  online.clientId = message.clientId || online.clientId;
+  online.creatorId = message.creatorId || online.creatorId;
+  if (Number.isFinite(Number(message.seat))) online.seat = Number(message.seat);
+  online.isHost = !!online.clientId && online.clientId === online.creatorId;
+  online.connected = true;
+
+  online.seatClients = {};
+  online.clientSeats = {};
+  online.readySeats = {};
+  const seats = Array.isArray(message.seats) ? message.seats : [];
+  const profiles = {};
+  seats.forEach((seatInfo, index) => {
+    if (!seatInfo) return;
+    profiles[index] = { name: seatInfo.name || `玩家 ${index}`, avatarUrl: seatInfo.avatarUrl || "" };
+    if (seatInfo.human && seatInfo.clientId) {
+      online.seatClients[index] = seatInfo.clientId;
+      online.clientSeats[seatInfo.clientId] = index;
+    }
+    if (seatInfo.ready) online.readySeats[index] = true;
+  });
+
+  if (!online.hasSnapshot || !state.players.length) {
+    setupWaitingRoom({ preserveProfiles: profiles });
+    online.hasSnapshot = true;
+  }
+
+  seats.forEach((seatInfo, index) => {
+    const player = state.players[index];
+    if (!player) return;
+    if (!seatInfo) {
+      if (online.waitingRoom && index > 0) {
+        player.human = false;
+        player.botFilled = false;
+        player.name = `空位 ${index}`;
+        player.avatarUrl = "";
+      }
+      return;
+    }
+    player.name = seatInfo.name || (index === 0 ? "房主" : `玩家 ${index}`);
+    player.avatarUrl = cleanAvatarUrl(seatInfo.avatarUrl);
+    player.human = !!seatInfo.human;
+    player.botFilled = !!seatInfo.bot;
+  });
+
+  setJoining(false);
+  render();
+  updateOnlineStatus();
+}
+
 function broadcastSnapshot() {
   if (!online.connected || !online.isHost || !online.socket || online.socket.readyState !== WebSocket.OPEN) return;
   for (const [seat, clientId] of Object.entries(online.seatClients)) {
+    if (clientId === online.clientId) continue;
     sendSocket({
       type: "relay",
       to: clientId,
@@ -2399,10 +2452,6 @@ el.readyBtn.addEventListener("click", () => {
   if (!online.connected || !online.waitingRoom) return;
   const seat = localSeat();
   const ready = !online.readySeats[seat];
-  if (online.isHost) {
-    setSeatReady(seat, ready);
-    return;
-  }
   sendSocket({ type: "action", action: "ready", ready });
 });
 
@@ -2428,7 +2477,12 @@ el.hostBtn.addEventListener("click", async () => {
   const requestedRoomId = bootParams.get("host") === "1"
     ? String(bootParams.get("room") || "").trim().toUpperCase()
     : "";
-  sendSocket({ type: "create", roomId: requestedRoomId });
+  sendSocket({
+    type: "create",
+    roomId: requestedRoomId,
+    name: state.players[0].name,
+    avatarUrl: state.players[0].avatarUrl
+  });
   setJoining(false);
   render();
 });
@@ -2493,7 +2547,7 @@ document.addEventListener("pointerdown", startAudioOnce, { once: true, passive: 
 
 el.renameBtn.addEventListener("click", () => {
   const name = cleanPlayerName(el.nameInput.value, localSeat() === 0 ? "你" : `玩家 ${localSeat()}`);
-  if (online.connected && !online.isHost) {
+  if (online.connected) {
     sendSocket({ type: "action", action: "rename", name, avatarUrl: cleanAvatarUrl(bootParams.get("avatar")) });
     return;
   }
@@ -2620,6 +2674,11 @@ function requestSeatInvite(seat) {
 function fillSeatWithBot(seat) {
   const player = state.players[seat];
   if (!player) return;
+  if (online.connected) {
+    if (!online.isHost) updateOnlineStatus("只有创建房间的人可以填入人机。");
+    else sendSocket({ type: "action", action: "fillBot", seat });
+    return;
+  }
   if (online.connected && !online.isHost) {
     updateOnlineStatus("只有房主可以用人机填入空位。");
     return;
@@ -2699,9 +2758,10 @@ function handleSocketMessage(message) {
     online.pendingRole = "";
     online.roomId = message.roomId;
     online.clientId = message.clientId;
+    online.creatorId = message.creatorId || message.clientId;
     online.connected = true;
     online.isHost = true;
-    online.seat = 0;
+    online.seat = Number.isFinite(Number(message.seat)) ? Number(message.seat) : 0;
     online.hasSnapshot = true;
     online.seatClients = {};
     online.clientSeats = {};
@@ -2733,11 +2793,17 @@ function handleSocketMessage(message) {
     online.pendingRole = "";
     online.roomId = message.roomId;
     online.clientId = message.clientId;
+    online.creatorId = message.creatorId || online.creatorId;
     online.connected = true;
     online.isHost = false;
+    online.seat = Number.isFinite(Number(message.seat)) ? Number(message.seat) : online.seat;
     postMiniProgramRoom(online.roomId);
     updateOnlineStatus("已加入，等待房主同步牌局");
     setJoining(true, "已加入房间", "等待房主同步牌局...");
+    return;
+  }
+  if (message.type === "roomState") {
+    applyRoomState(message);
     return;
   }
   if (message.type === "joinRequest" && online.isHost) {

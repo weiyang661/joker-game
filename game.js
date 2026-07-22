@@ -158,6 +158,8 @@ const audioState = {
   musicTimer: null,
   beat: 0,
   voiceCache: new Map(),
+  voiceFetchCache: new Map(),
+  voiceResolvedSrc: new Map(),
   voiceWarmed: false,
   voiceActiveUntil: new Map()
 };
@@ -1371,7 +1373,8 @@ function playVoicePresetSfx(kind, onDone) {
   startAudioOnce();
   const preset = voicePresets[kind];
   if (preset && preset.file) {
-    playVoiceAudioSources(voiceFileSources(preset.file), preset.label, 0, onDone);
+    preloadVoicePreset(kind);
+    playVoiceAudioSources(voiceAudioSourcesFor(kind), preset.label, 0, onDone);
     return;
   }
   console.warn("语音不存在", kind);
@@ -1418,6 +1421,13 @@ function voiceFileSources(file) {
   ];
 }
 
+function voiceAudioSourcesFor(kind) {
+  const resolved = audioState.voiceResolvedSrc.get(kind);
+  if (resolved) return [resolved];
+  const preset = voicePresets[kind];
+  return preset ? voiceFileSources(preset.file) : [];
+}
+
 function getVoiceAudio(src) {
   if (!audioState.voiceCache.has(src)) {
     const audio = new Audio(src);
@@ -1429,11 +1439,60 @@ function getVoiceAudio(src) {
   return audioState.voiceCache.get(src);
 }
 
+function waitForAudioReady(audio, timeoutMs = 1800) {
+  if (!audio) return Promise.resolve(false);
+  if (audio.readyState >= 3) return Promise.resolve(true);
+  return new Promise(resolve => {
+    let done = false;
+    const finish = ok => {
+      if (done) return;
+      done = true;
+      audio.removeEventListener("canplaythrough", onReady);
+      audio.removeEventListener("loadeddata", onReady);
+      audio.removeEventListener("error", onError);
+      resolve(ok);
+    };
+    const onReady = () => finish(true);
+    const onError = () => finish(false);
+    audio.addEventListener("canplaythrough", onReady, { once: true });
+    audio.addEventListener("loadeddata", onReady, { once: true });
+    audio.addEventListener("error", onError, { once: true });
+    setTimeout(() => finish(audio.readyState >= 2), timeoutMs);
+  });
+}
+
+async function preloadVoicePreset(kind) {
+  const preset = voicePresets[kind];
+  if (!preset || !preset.file) return false;
+  if (audioState.voiceResolvedSrc.has(kind)) return true;
+  if (audioState.voiceFetchCache.has(kind)) return audioState.voiceFetchCache.get(kind);
+  const promise = (async () => {
+    for (const src of voiceFileSources(preset.file)) {
+      try {
+        const audio = getVoiceAudio(src);
+        audio.load();
+        const ready = await waitForAudioReady(audio);
+        if (ready || audio.readyState >= 2) {
+          audioState.voiceResolvedSrc.set(kind, src);
+          return true;
+        }
+      } catch {
+        // Try the next path; some hosts handle Chinese filenames differently.
+      }
+    }
+    return false;
+  })();
+  audioState.voiceFetchCache.set(kind, promise);
+  return promise;
+}
+
 function warmVoiceAudioCache() {
   if (audioState.voiceWarmed) return;
   audioState.voiceWarmed = true;
-  Object.values(voicePresets).forEach(preset => {
-    voiceFileSources(preset.file).forEach(src => getVoiceAudio(src));
+  Object.keys(voicePresets).forEach((kind, index) => {
+    setTimeout(() => {
+      preloadVoicePreset(kind);
+    }, index * 160);
   });
 }
 
@@ -1444,8 +1503,7 @@ function playVoiceAudioSources(sources, label, index = 0, onDone) {
     if (onDone) onDone();
     return;
   }
-  const cached = getVoiceAudio(src);
-  const audio = cached.cloneNode(true);
+  const audio = getVoiceAudio(src);
   audio.volume = 0.95;
   let settled = false;
   const finish = () => {
@@ -1460,6 +1518,10 @@ function playVoiceAudioSources(sources, label, index = 0, onDone) {
   };
   audio.addEventListener("ended", finish, { once: true });
   audio.addEventListener("error", tryNext, { once: true });
+  try {
+    audio.pause();
+    audio.currentTime = 0;
+  } catch {}
   audio.play().catch(tryNext);
 }
 
@@ -1691,8 +1753,60 @@ function render() {
   renderTablePlayLayer();
   renderHand();
   renderPanels();
+  renderWaitingDock();
   renderSettlementOverlay();
   broadcastSnapshot();
+}
+
+function ensureWaitingDock() {
+  if (el.waitingDock) return el.waitingDock;
+  const dock = document.createElement("div");
+  dock.id = "waitingDock";
+  dock.className = "waitingDock";
+  dock.setAttribute("aria-live", "polite");
+  dock.addEventListener("click", event => {
+    startAudioOnce();
+    const action = event.target.closest("[data-waiting-dock-action]");
+    if (!action) return;
+    const type = action.dataset.waitingDockAction;
+    if (type === "ready") {
+      el.readyBtn.click();
+    } else if (type === "start") {
+      el.startOnlineBtn.click();
+    } else if (type === "invite") {
+      el.inviteBtn.click();
+    } else if (type === "reconnect") {
+      rejoinCurrentRoom();
+    }
+  });
+  document.body.appendChild(dock);
+  el.waitingDock = dock;
+  return dock;
+}
+
+function renderWaitingDock() {
+  const dock = ensureWaitingDock();
+  const show = online.connected && online.waitingRoom;
+  document.body.dataset.waitingRoom = show ? "true" : "false";
+  if (!show) {
+    dock.hidden = true;
+    dock.innerHTML = "";
+    return;
+  }
+  const ready = !!online.readySeats[localSeat()];
+  const canStart = online.isHost && allJoinedPlayersReady();
+  const reconnect = online.socket && online.socket.readyState === WebSocket.OPEN ? "" : `
+    <button class="waitingDockBtn secondary" type="button" data-waiting-dock-action="reconnect">重新连接</button>`;
+  const invite = online.isHost && online.roomId ? `
+    <button class="waitingDockBtn secondary" type="button" data-waiting-dock-action="invite">邀请好友</button>` : "";
+  const start = online.isHost ? `
+    <button class="waitingDockBtn primary" type="button" data-waiting-dock-action="start" ${canStart ? "" : "disabled"}>开始本局</button>` : "";
+  dock.hidden = false;
+  dock.innerHTML = `
+    ${invite}
+    <button class="waitingDockBtn primary" type="button" data-waiting-dock-action="ready">${ready ? "取消准备" : "准备"}</button>
+    ${start}
+    ${reconnect}`;
 }
 
 function ensureSettlementOverlayInBody() {
@@ -3342,6 +3456,7 @@ function hideInviteJoinDialog() {
 }
 
 function bootGame() {
+  setTimeout(warmVoiceAudioCache, 500);
   if (isMiniProgramView) {
     setupWaitingRoom({ resetMatch: true });
     initInviteParams();
@@ -3356,5 +3471,10 @@ function bootGame() {
   startGame({ resetMatch: true });
   initInviteParams();
 }
+
+document.addEventListener("pointerdown", () => {
+  startAudioOnce();
+  warmVoiceAudioCache();
+}, { once: true, passive: true });
 
 bootGame();

@@ -7,7 +7,7 @@ const root = __dirname;
 const uploadRoot = path.join(root, "uploads");
 const rooms = new Map();
 const startedAt = Date.now();
-const version = "2026-07-22-reconnect-host-lock-v1";
+const version = "2026-07-22-fixed-seat-host-v2";
 const ROOM_IDLE_TTL_MS = 10 * 60 * 1000;
 
 const server = http.createServer((req, res) => {
@@ -229,9 +229,11 @@ function createRoom(client, message) {
     return;
   }
   const roomId = requestedRoomId || newRoomId();
+  client.sessionId = String(message.sessionId || "");
   const room = {
     id: roomId,
     creatorId: client.id,
+    creatorSessionId: client.sessionId,
     clients: new Map([[client.id, client]]),
     seats: Array.from({ length: 5 }, () => null),
     voiceActiveUntil: new Map(),
@@ -322,7 +324,12 @@ function rejoinRoom(client, message) {
     message.avatarUrl || oldSeat.avatarUrl || ""
   );
   room.seats[seatIndex].ready = !!oldSeat.ready;
-  if (seatIndex === 0) room.creatorId = client.id;
+  const rejoinsCreatorSeat = seatIndex === 0
+    && (!room.creatorSessionId || room.creatorSessionId === client.sessionId || room.creatorSessionId === oldSeat.sessionId);
+  if (rejoinsCreatorSeat) {
+    room.creatorId = client.id;
+    room.creatorSessionId = client.sessionId || room.creatorSessionId || oldSeat.sessionId || "";
+  }
 
   send(client, { type: "rejoined", roomId: room.id, clientId: client.id, seat: seatIndex, creatorId: room.creatorId });
   broadcastRoomState(room);

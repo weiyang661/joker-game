@@ -114,10 +114,19 @@ const el = {
 function getOnlineSessionId() {
   try {
     const key = "joker_online_session_id";
+    const stored = localStorage.getItem(key);
+    if (stored) {
+      sessionStorage.setItem(key, stored);
+      return stored;
+    }
     const existing = sessionStorage.getItem(key);
-    if (existing) return existing;
+    if (existing) {
+      localStorage.setItem(key, existing);
+      return existing;
+    }
     const next = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
     sessionStorage.setItem(key, next);
+    localStorage.setItem(key, next);
     return next;
   } catch {
     return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
@@ -272,7 +281,7 @@ function localPlayer() {
 }
 
 function relativeSeatIndex(seat) {
-  return (Number(seat) - localSeat() + 5) % 5;
+  return Number(seat);
 }
 
 function isHostRuntime() {
@@ -346,7 +355,7 @@ function makeLobbyPlayer(index, name, profiles = {}) {
 
 function isWaitingRoomView() {
   const noCardsDealt = state.players.every(player => !player.hand || player.hand.length === 0);
-  return !!(online.waitingRoom || (online.roomId && !state.hasPlayed && !state.revealPhase && noCardsDealt));
+  return !!(online.roomId && noCardsDealt && (online.waitingRoom || (!state.hasPlayed && !state.revealPhase)));
 }
 
 function isSeatHumanInWaiting(index) {
@@ -460,6 +469,7 @@ function startGame(options = {}) {
     state.playerMatch = [0, 0, 0, 0, 0];
     state.firstFinisherNext = 0;
   }
+  if (online.roomId) online.waitingRoom = false;
   const preservedProfiles = { ...preservedOnlineProfiles(), ...(options.preserveProfiles || {}) };
   const preservedNames = { ...preservedOnlineNames(), ...(options.preserveNames || {}) };
   Object.keys(preservedNames).forEach(seat => {
@@ -1956,7 +1966,7 @@ function applyRoomState(message) {
   online.clientId = message.clientId || online.clientId;
   online.creatorId = message.creatorId || online.creatorId;
   if (Number.isFinite(Number(message.seat))) online.seat = Number(message.seat);
-  online.isHost = (!!online.clientId && online.clientId === online.creatorId) || online.seat === 0;
+  online.isHost = !!online.clientId && online.clientId === online.creatorId;
   online.connected = true;
   cancelReconnect();
 
@@ -2011,7 +2021,7 @@ function broadcastSnapshot() {
       type: "snapshot",
       state: serializeState(),
       roomId: online.roomId,
-      waitingRoom: online.waitingRoom,
+      waitingRoom: isWaitingRoomView(),
       readySeats: online.readySeats
     }
   });
@@ -2025,7 +2035,7 @@ function broadcastSnapshot() {
         state: serializeState(),
         seat: Number(seat),
         roomId: online.roomId,
-        waitingRoom: online.waitingRoom,
+        waitingRoom: isWaitingRoomView(),
         readySeats: online.readySeats
       }
     });
@@ -3018,6 +3028,7 @@ el.startOnlineBtn.addEventListener("click", () => {
   fillEmptySeatsWithBots();
   online.waitingRoom = false;
   startGame({ preserveNames: preservedOnlineNames() });
+  broadcastSnapshot();
 });
 
 el.readyBtn.addEventListener("click", () => {
@@ -3570,7 +3581,7 @@ function handleSocketMessage(message) {
     online.creatorId = message.creatorId || online.creatorId;
     online.connected = true;
     online.seat = Number.isFinite(Number(message.seat)) ? Number(message.seat) : online.seat;
-    online.isHost = (!!online.clientId && online.clientId === online.creatorId) || online.seat === 0;
+    online.isHost = !!online.clientId && online.clientId === online.creatorId;
     postMiniProgramRoom(online.roomId);
     setJoining(false);
     updateOnlineStatus("已重新进入牌局");

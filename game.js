@@ -344,8 +344,24 @@ function makeLobbyPlayer(index, name, profiles = {}) {
   };
 }
 
+function isWaitingRoomView() {
+  const noCardsDealt = state.players.every(player => !player.hand || player.hand.length === 0);
+  return !!(online.waitingRoom || (online.roomId && !state.hasPlayed && !state.revealPhase && noCardsDealt));
+}
+
+function isSeatHumanInWaiting(index) {
+  if (!online.connected) return index === 0;
+  if (index === localSeat()) return true;
+  if (index === 0 && online.isHost) return true;
+  return Object.prototype.hasOwnProperty.call(online.seatClients, index);
+}
+
+function isWaitingBotSeat(player, index) {
+  return isWaitingRoomView() && index > 0 && player && player.botFilled && !isSeatHumanInWaiting(index);
+}
+
 function isWaitingEmptySeat(player, index) {
-  return online.connected && online.waitingRoom && index > 0 && player && !player.human && !player.botFilled;
+  return isWaitingRoomView() && index > 0 && player && !isSeatHumanInWaiting(index) && !player.botFilled;
 }
 
 function setupWaitingRoom(options = {}) {
@@ -389,8 +405,8 @@ function setupWaitingRoom(options = {}) {
 function humanSeatsInRoom() {
   if (!online.connected) return [0];
   return state.players
-    .filter(player => player.human)
-    .map(player => player.id)
+    .map((player, index) => index)
+    .filter(index => isWaitingRoomView() ? isSeatHumanInWaiting(index) : state.players[index].human)
     .sort((a, b) => a - b);
 }
 
@@ -412,9 +428,9 @@ function setSeatReady(seat, ready) {
 
 function firstOpenSeat(preferredSeat = null) {
   const preferred = Number(preferredSeat);
-  if (preferred >= 1 && preferred <= 4 && !online.seatClients[preferred]) return preferred;
+  if (preferred >= 1 && preferred <= 4 && !isSeatHumanInWaiting(preferred)) return preferred;
   for (let seat = 1; seat <= 4; seat += 1) {
-    if (!online.seatClients[seat]) return seat;
+    if (!isSeatHumanInWaiting(seat)) return seat;
   }
   return null;
 }
@@ -423,7 +439,7 @@ function fillEmptySeatsWithBots() {
   let changed = false;
   for (let seat = 1; seat <= 4; seat += 1) {
     const player = state.players[seat];
-    if (!player || player.human || player.botFilled) continue;
+    if (!player || isSeatHumanInWaiting(seat) || player.botFilled) continue;
     if (online.connected && online.isHost) {
       sendSocket({ type: "action", action: "fillBot", seat });
     }
@@ -1809,6 +1825,30 @@ function renderWaitingDock() {
     ${reconnect}`;
 }
 
+function renderWaitingDock() {
+  const dock = ensureWaitingDock();
+  const waitingView = isWaitingRoomView();
+  const socketOpen = online.socket && online.socket.readyState === WebSocket.OPEN;
+  const show = waitingView || (!!online.roomId && !socketOpen);
+  document.body.dataset.waitingRoom = show ? "true" : "false";
+  if (!show) {
+    dock.hidden = true;
+    dock.innerHTML = "";
+    return;
+  }
+  const ready = !!online.readySeats[localSeat()];
+  const canStart = online.connected && online.isHost && allJoinedPlayersReady();
+  const reconnect = socketOpen ? "" : `
+    <button class="waitingDockBtn secondary" type="button" data-waiting-dock-action="reconnect">重新连接</button>`;
+  const start = online.isHost ? `
+    <button class="waitingDockBtn primary" type="button" data-waiting-dock-action="start" ${canStart ? "" : "disabled"}>开始本局</button>` : "";
+  dock.hidden = false;
+  dock.innerHTML = `
+    <button class="waitingDockBtn primary" type="button" data-waiting-dock-action="ready" ${online.connected ? "" : "disabled"}>${ready ? "取消准备" : "准备"}</button>
+    ${start}
+    ${reconnect}`;
+}
+
 function ensureSettlementOverlayInBody() {
   if (!el.settlementOverlay) {
     el.settlementOverlay = document.createElement("section");
@@ -1944,7 +1984,7 @@ function applyRoomState(message) {
     const player = state.players[index];
     if (!player) return;
     if (!seatInfo) {
-      if (online.waitingRoom && index > 0) {
+      if (isWaitingRoomView() && index > 0) {
         player.human = false;
         player.botFilled = false;
         player.name = `空位 ${index}`;
@@ -2108,7 +2148,7 @@ function renderTableCenter() {
 
 function renderTablePlayLayer() {
   if (!el.tablePlayLayer) return;
-  if (online.connected && online.waitingRoom) {
+  if (isWaitingRoomView()) {
     el.tablePlayLayer.innerHTML = "";
     return;
   }
@@ -2139,6 +2179,65 @@ function renderTablePlayLayer() {
 
 function remainingBigCount() {
   return state.players.reduce((sum, player) => sum + player.hand.filter(card => card.joker === "big").length, 0);
+}
+
+function renderTableCenter() {
+  if (isWaitingRoomView()) {
+    el.tableCenter.classList.add("waitingCenter");
+    const readyLine = humanSeatsInRoom()
+      .map(seat => `${(state.players[seat] && state.players[seat].name) || `玩家 ${seat}`}：${online.readySeats[seat] ? "已准备" : "未准备"}`)
+      .join("　");
+    const hostHint = online.isHost
+      ? "房主保留开始本局权限。空位可邀请好友，也可点开始后自动补入人机。"
+      : "等待房主开始本局。";
+    el.tableCenter.innerHTML = `
+      <div class="phasePill">房间准备</div>
+      <div class="centerNotice">${state.tableNotice || "等待玩家加入并准备"}</div>
+      <div class="centerLine">${readyLine || "等待玩家加入"}</div>
+      <div class="centerLine">${hostHint}</div>
+    `;
+    return;
+  }
+  el.tableCenter.classList.remove("waitingCenter");
+  const player = state.players[state.current];
+  const phase = state.revealPhase
+    ? "亮王阶段"
+    : state.continuingForNextLead
+    ? "寻找下一局先手"
+    : state.gameOver
+    ? "本局结束"
+    : "出牌阶段";
+  const current = state.revealPhase || state.gameOver && !state.continuingForNextLead
+    ? ""
+    : `<div class="centerLine">轮到：<strong>${(player && player.name) || "无"}</strong></div>`;
+  const settlement = state.roundSettled
+    ? `<div class="settlementStrip">${state.lastSettlement.map(item => `<span>${item.name} 总分 ${item.total} 本局 ${formatSigned(item.delta)}</span>`).join("")}</div>`
+    : "";
+  const snowChoice = state.pendingSnowChoice
+    ? `<div class="centerLine"><strong>${teamName(state.pendingSnowChoice.winnerTeam)}</strong> 未出完玩家可选择雪或不雪</div>`
+    : "";
+  if (isMiniProgramView) {
+    const turnLine = state.revealPhase || state.gameOver && !state.continuingForNextLead
+      ? (state.tableNotice || "")
+      : `轮到：${(player && player.name) || "无"}`;
+    el.tableCenter.innerHTML = `
+      <div class="phasePill">${phase}</div>
+      <div class="trickScoreCenter">${state.trickPoints}<span>分</span></div>
+      <div class="centerLine">${turnLine}</div>
+      ${snowChoice}
+      ${settlement}
+    `;
+    return;
+  }
+  el.tableCenter.innerHTML = `
+    <div class="phasePill">${phase}</div>
+    <div class="centerNotice">${state.tableNotice || "等待出牌"}</div>
+    ${current}
+    <div class="centerLine">本墩分：<strong>${state.trickPoints}</strong></div>
+    <div class="centerLine">牌局中剩余大王：<strong>${bigJokersRemaining()}</strong> 张</div>
+    ${snowChoice}
+    ${settlement}
+  `;
 }
 
 function revealedBigStatus(player) {
@@ -2208,6 +2307,66 @@ function renderTable() {
   renderTableCenter();
 }
 
+function renderTable() {
+  const positions = [
+    ["50%", "78%"],
+    ["18%", "58%"],
+    ["40%", "18%"],
+    ["62%", "18%"],
+    ["84%", "58%"]
+  ];
+  const waitingView = isWaitingRoomView();
+  const seats = state.players.map((player, index) => {
+    const seatIndex = relativeSeatIndex(index);
+    const isTurn = index === state.current && (!state.gameOver || state.continuingForNextLead);
+    const emptySeat = isWaitingEmptySeat(player, index);
+    const botWaitingSeat = isWaitingBotSeat(player, index);
+    const humanWaitingSeat = waitingView && isSeatHumanInWaiting(index);
+    const team = waitingView
+      ? (humanWaitingSeat ? (online.readySeats[index] ? "已准备" : "未准备") : (botWaitingSeat ? "人机候补" : "可邀请"))
+      : player.id === localSeat() ? teamName(player.team) : visibleTeam(player);
+    if (emptySeat) {
+      return `<article class="seat seat${seatIndex} emptySeat" data-seat="${index}" style="left:${positions[seatIndex][0]};top:${positions[seatIndex][1]}">
+        <button class="seatInviteBtn" type="button" data-seat="${index}" aria-label="邀请或填入座位 ${index}">
+          <span>+</span>
+        </button>
+        <div class="name">空位 ${index}</div>
+      </article>`;
+    }
+    if (botWaitingSeat) {
+      return `<article class="seat seat${seatIndex} emptySeat botWaitingSeat" data-seat="${index}" style="left:${positions[seatIndex][0]};top:${positions[seatIndex][1]}">
+        <button class="seatInviteBtn botSeatBtn" type="button" data-seat="${index}" aria-label="管理人机座位 ${index}">
+          <span>人</span>
+        </button>
+        <div class="name">人机 ${index}</div>
+        <div class="meta">可踢出/替换</div>
+      </article>`;
+    }
+    const revealHands = shouldRevealHands();
+    const handPreview = revealHands && player.hand.length
+      ? `<div class="miniCards revealedHand">${player.hand.map(tinyCard).join("")}</div>`
+      : player.id === localSeat() ? "" : `<div class="miniCards">${Array.from({ length: Math.min(player.hand.length, 10) }, () => `<span class="backCard"></span>`).join("")}</div>`;
+    const revealMark = player.revealAnnouncement ? `<div class="revealMark">${player.revealAnnouncement}${revealedBigStatus(player)}</div>` : "";
+    const roundScoreText = `${player.score}分`;
+    const avatarImage = player.avatarUrl
+      ? `<img class="seatAvatarImage" src="${escapeAttr(player.avatarUrl)}" alt="">`
+      : "";
+    return `<article class="seat seat${seatIndex}" data-seat="${index}" style="left:${positions[seatIndex][0]};top:${positions[seatIndex][1]}">
+      <div class="seatTopInfo"><span>${team}</span><b>${roundScoreText}</b></div>
+      <div class="seatAvatar">${avatarImage}</div>
+      <div class="name">${isTurn ? "▶" : ""}${player.name}</div>
+      <div class="cardCountBadge">${player.hand.length}</div>
+      <div class="scoreTag">${player.score} 分</div>
+      <div class="meta">${player.finished ? "已出完" : ""}</div>
+      ${revealMark}
+      ${handPreview}
+    </article>`;
+  }).join("");
+  el.table.innerHTML = `${tableTeamScoreMarkup()}${seats}<div class="tableCenter" id="tableCenter"></div>`;
+  el.tableCenter = document.querySelector("#tableCenter");
+  renderTableCenter();
+}
+
 function tableTeamScoreMarkup() {
   const revealScores = state.roundSettled || (state.gameOver && !state.continuingForNextLead) || allTeamsDetermined();
   const king = revealScores ? state.scores.king : "未知";
@@ -2248,7 +2407,7 @@ function allPublicBigCardsKnown() {
 
 function renderHand() {
   const human = localPlayer();
-  if (online.connected && online.waitingRoom) {
+  if (isWaitingRoomView()) {
     el.hand.innerHTML = "";
     renderSelection();
     return;
@@ -2299,7 +2458,7 @@ function renderHand() {
 
 function canViewTeammateHands() {
   const human = localPlayer();
-  return !!(human && human.finished) && allTeamsDetermined() && !online.waitingRoom;
+  return !!(human && human.finished) && allTeamsDetermined() && !isWaitingRoomView();
 }
 
 function teammateHandsHtml(human) {
@@ -2321,11 +2480,9 @@ function teammateHandsHtml(human) {
 }
 
 function renderSelection() {
-  if (online.connected && online.waitingRoom) {
-    const mode = currentActionMode();
-    document.body.dataset.actionVisible = "true";
+  if (isWaitingRoomView()) {
+    document.body.dataset.actionVisible = "false";
     el.selectionInfo.textContent = "房间准备中，开始本局后才会发牌。";
-    renderActionButtons(mode);
     el.teammateBtn.disabled = true;
     el.teammateBtn.hidden = true;
     return;
@@ -2376,10 +2533,10 @@ function undecidedLocalBigs() {
 
 function currentActionMode() {
   const human = localPlayer();
-  if (online.connected && online.waitingRoom) {
+  if (isWaitingRoomView()) {
     return { type: "waiting" };
   }
-  if (state.revealPhase && !online.waitingRoom) {
+  if (state.revealPhase && !isWaitingRoomView()) {
     const undecided = undecidedLocalBigs();
     if (undecided.length) return { type: "reveal", count: undecided.length };
   }
@@ -2391,7 +2548,7 @@ function currentActionMode() {
 
 function shouldShowActionButtons(mode, human) {
   if (!human) return false;
-  if (mode.type === "waiting") return true;
+  if (mode.type === "waiting") return false;
   if (mode.type === "reveal" || mode.type === "snow") return true;
   if (human.finished) return canViewTeammateHands();
   return !state.pendingSnowChoice
@@ -2465,21 +2622,22 @@ function laneName(lane) {
 
 function renderPanels() {
   normalizeScores();
-  const tableOnly = !online.waitingRoom;
+  const waitingView = isWaitingRoomView();
+  const tableOnly = isMiniProgramView || !waitingView;
   document.body.dataset.tableOnly = tableOnly ? "true" : "false";
   document.body.dataset.menu = menuMode;
   applyMenuLayout();
   el.menuToggleBtn.textContent = menuMode === "full" ? "缩小菜单" : menuMode === "mini" ? "收起菜单" : "展开菜单";
   el.newGameBtn.disabled = online.connected && !online.isHost;
-  el.nextRoundBtn.disabled = online.waitingRoom || !state.gameOver || state.continuingForNextLead || state.revealPhase;
+  el.nextRoundBtn.disabled = waitingView || !state.gameOver || state.continuingForNextLead || state.revealPhase;
   if (online.connected && !online.isHost) el.nextRoundBtn.disabled = true;
-  el.readyBtn.disabled = !online.connected || !online.waitingRoom;
+  el.readyBtn.disabled = !online.connected || !waitingView;
   el.readyBtn.textContent = online.readySeats[localSeat()] ? "取消准备" : "准备";
-  el.startOnlineBtn.disabled = !online.connected || !online.isHost || !online.waitingRoom || !allJoinedPlayersReady();
+  el.startOnlineBtn.disabled = !online.connected || !online.isHost || !waitingView || !allJoinedPlayersReady();
   if (el.inviteBtn) el.inviteBtn.disabled = !online.connected || !online.isHost || !online.roomId;
   if (el.hostBtn) el.hostBtn.disabled = online.joining || isOnlineRoomMember();
   if (el.joinBtn) el.joinBtn.disabled = online.joining || isOnlineRoomMember();
-  el.autoBtn.disabled = online.waitingRoom || online.connected && !online.isHost || state.revealPhase || (state.gameOver && !state.continuingForNextLead) || state.current !== localSeat();
+  el.autoBtn.disabled = waitingView || online.connected && !online.isHost || state.revealPhase || (state.gameOver && !state.continuingForNextLead) || state.current !== localSeat();
   el.trickPoints.textContent = state.trickPoints;
   const revealTeamScores = state.roundSettled || (state.gameOver && !state.continuingForNextLead) || allTeamsDetermined();
   el.kingScore.textContent = revealTeamScores ? state.scores.king : "未公开";
@@ -2488,7 +2646,7 @@ function renderPanels() {
     .map(player => `<span>${player.name}<b>${formatSigned(player.matchScore || 0)}</b></span>`)
     .join("");
   const player = state.players[state.current];
-  el.statusBox.innerHTML = online.connected && online.waitingRoom
+  el.statusBox.innerHTML = online.connected && waitingView
     ? `房间准备中<br>${humanSeatsInRoom().map(seat => `${(state.players[seat] && state.players[seat].name) || `玩家 ${seat}`}：${online.readySeats[seat] ? "已准备" : "未准备"}`).join("<br>")}`
     : state.revealPhase
     ? `亮王阶段<br>已亮大王：${bigRevealCount()} 张`
@@ -2557,7 +2715,7 @@ function renderSettlementOverlay() {
 }
 
 function shouldShowSettlementOverlay() {
-  if (online.waitingRoom || state.pendingSnowChoice) return false;
+  if (isWaitingRoomView() || state.pendingSnowChoice) return false;
   if (state.roundSettled || state.lastSettlement.length > 0) return true;
   return isFinalSettlementNotice(state.tableNotice);
 }
@@ -2616,7 +2774,7 @@ function renderRevealBox() {
     el.revealBox.innerHTML = `等待${teamName(pending.winnerTeam)}未出完玩家选择雪或不雪。`;
     return;
   }
-  if (online.connected && online.waitingRoom) {
+  if (isWaitingRoomView()) {
     el.revealBox.innerHTML = "房间准备中，所有已入房真人准备后由房主开始发牌。";
     return;
   }
@@ -2851,6 +3009,7 @@ el.settlementNextBtn && el.settlementNextBtn.addEventListener("click", () => {
 
 el.startOnlineBtn.addEventListener("click", () => {
   if (!online.connected || !online.isHost) return;
+  online.waitingRoom = true;
   if (!allJoinedPlayersReady()) {
     state.tableNotice = "还有玩家未准备，不能开始";
     render();
@@ -2862,7 +3021,8 @@ el.startOnlineBtn.addEventListener("click", () => {
 });
 
 el.readyBtn.addEventListener("click", () => {
-  if (!online.connected || !online.waitingRoom) return;
+  if (!online.connected || !isWaitingRoomView()) return;
+  online.waitingRoom = true;
   const seat = localSeat();
   const ready = !online.readySeats[seat];
   sendSocket({ type: "action", action: "ready", ready });
@@ -3039,6 +3199,137 @@ function postMiniProgramRoom(roomId) {
 
 function postMiniProgramShare(roomId) {
   if (!roomId || !(window.wx && window.wx.miniProgram)) return;
+  if (window.wx.miniProgram.postMessage) {
+    window.wx.miniProgram.postMessage({
+      data: {
+        roomId,
+        action: "share",
+        title: `五人牌局 房间 ${roomId}，点击立即加入`
+      }
+    });
+  }
+  if (window.wx.miniProgram.navigateTo) {
+    window.wx.miniProgram.navigateTo({
+      url: `/pages/share/share?room=${encodeURIComponent(roomId)}`
+    });
+  }
+}
+
+function showSeatChoice(seat) {
+  const existing = document.querySelector(".seatChoiceOverlay");
+  if (existing) existing.remove();
+  const player = state.players[seat];
+  if (isSeatHumanInWaiting(seat)) return;
+  const isBotSeat = isWaitingBotSeat(player, seat);
+  const overlay = document.createElement("section");
+  overlay.className = "seatChoiceOverlay";
+  overlay.innerHTML = `
+    <div class="seatChoiceCard">
+      <strong>${isBotSeat ? `人机 ${seat}` : `空位 ${seat}`}</strong>
+      <span>${isBotSeat ? "这个座位当前是人机，可以踢出后继续等真人，也可以邀请好友顶替。" : "可以邀请微信好友加入，也可以先填入人机测试。"}</span>
+      <div>
+        <button class="primary" data-action="invite">邀请微信好友</button>
+        ${isBotSeat ? `<button data-action="removeBot">踢出人机</button>` : `<button data-action="bot">填入人机</button>`}
+        <button data-action="cancel">取消</button>
+      </div>
+    </div>
+  `;
+  overlay.addEventListener("click", event => {
+    const action = event.target.dataset.action;
+    if (!action && event.target !== overlay) return;
+    if (action === "invite") requestSeatInvite(seat);
+    if (action === "bot") fillSeatWithBot(seat);
+    if (action === "removeBot") removeSeatBot(seat);
+    overlay.remove();
+  });
+  document.body.appendChild(overlay);
+}
+
+function requestSeatInvite(seat) {
+  if (!online.connected || !online.roomId) {
+    updateOnlineStatus("请先开房，再邀请好友。");
+    return;
+  }
+  const url = inviteUrl(online.roomId);
+  postMiniProgramRoom(online.roomId);
+  if (isMiniProgramView) {
+    postMiniProgramShare(online.roomId);
+    state.tableNotice = `房间 ${online.roomId} 的邀请已准备好，请点“转发给好友”。`;
+    updateOnlineStatus(`邀请座位 ${seat}：好友打开后会直接进入房间`);
+    render();
+    return;
+  }
+  navigator.clipboard && navigator.clipboard.writeText(url).then(() => {
+    updateOnlineStatus(`邀请链接已复制：${url}`);
+  }).catch(() => {
+    window.prompt("复制这个邀请链接发给朋友：", url);
+  });
+}
+
+function fillSeatWithBot(seat) {
+  const player = state.players[seat];
+  if (!player) return;
+  if (online.connected) {
+    if (!online.isHost) {
+      updateOnlineStatus("只有房主可以填入人机。");
+      return;
+    }
+    if (isSeatHumanInWaiting(seat)) return;
+    sendSocket({ type: "action", action: "fillBot", seat });
+    player.botFilled = true;
+    player.human = false;
+    player.name = `人机 ${seat}`;
+    player.avatarUrl = "";
+    online.readySeats[seat] = true;
+    state.tableNotice = `座位 ${seat} 已用人机填入`;
+    render();
+    return;
+  }
+  if (player.human) return;
+  player.botFilled = true;
+  player.name = `人机 ${seat}`;
+  player.avatarUrl = "";
+  state.tableNotice = `座位 ${seat} 已用人机填入`;
+  addLog(`座位 ${seat} 已用人机填入。`);
+  render();
+}
+
+function removeSeatBot(seat) {
+  const player = state.players[seat];
+  if (!player) return;
+  if (online.connected) {
+    if (!online.isHost) {
+      updateOnlineStatus("只有房主可以踢出人机。");
+      return;
+    }
+    if (!isWaitingBotSeat(player, seat)) return;
+    sendSocket({ type: "action", action: "removeBot", seat });
+    player.botFilled = false;
+    player.human = false;
+    player.name = `空位 ${seat}`;
+    player.avatarUrl = "";
+    player.hand = [];
+    player.score = 0;
+    delete online.readySeats[seat];
+    state.tableNotice = `座位 ${seat} 已空出`;
+    render();
+    return;
+  }
+  if (!player.botFilled || player.human) return;
+  player.botFilled = false;
+  player.human = false;
+  player.name = `空位 ${seat}`;
+  player.avatarUrl = "";
+  player.hand = [];
+  player.score = 0;
+  state.tableNotice = `座位 ${seat} 已空出`;
+  addLog(`座位 ${seat} 已空出。`);
+  render();
+}
+
+/*
+function postMiniProgramShareLegacy(roomId) {
+  if (!roomId || !(window.wx && window.wx.miniProgram)) return;
   if (window.wx.miniProgram.postMessage) window.wx.miniProgram.postMessage({
     data: {
       roomId,
@@ -3143,6 +3434,8 @@ function removeSeatBot(seat) {
   addLog(`座位 ${seat} 已空出。`);
   render();
 }
+
+*/
 
 function rememberPlayerName(name) {
   return cleanPlayerName(name, "");
@@ -3302,7 +3595,7 @@ function handleSocketMessage(message) {
     state.players[seat].avatarUrl = cleanAvatarUrl(message.avatarUrl);
     state.players[seat].human = true;
     const moved = requestedSeat !== seat;
-    state.tableNotice = online.waitingRoom
+    state.tableNotice = isWaitingRoomView()
       ? `${state.players[seat].name} 已加入座位 ${seat}，等待房主开始本局`
       : `${state.players[seat].name} 加入座位 ${seat}`;
     addLog(`${state.players[seat].name} 加入座位 ${seat}${moved ? `（原座位 ${requestedSeat} 已占用，自动分配）` : ""}。`);
@@ -3359,7 +3652,7 @@ function handleRemoteAction(clientId, message) {
     return;
   }
   if (message.action === "ready") {
-    if (!online.waitingRoom) return;
+    if (!isWaitingRoomView()) return;
     setSeatReady(seat, !!message.ready);
     return;
   }
@@ -3375,7 +3668,7 @@ function handleRemoteAction(clientId, message) {
     return;
   }
   if (message.action === "reveal") {
-    if (online.waitingRoom) return;
+    if (isWaitingRoomView()) return;
     decidePlayerBigReveal(player, Number(message.count));
     render();
     return;
@@ -3409,6 +3702,25 @@ function updateOnlineStatus(extra = "") {
   } else {
     const readyText = online.waitingRoom ? ` · ${online.readySeats[online.seat] ? "已准备" : "未准备"}` : "";
     el.onlineStatus.textContent = extra || `房号 ${online.roomId} · ${(state.players[online.seat] && state.players[online.seat].name) || "你"}在座位 ${online.seat}${readyText}`;
+  }
+}
+
+function updateOnlineStatus(extra = "") {
+  const waitingView = isWaitingRoomView();
+  if (!online.connected) {
+    el.onlineStatus.textContent = extra || "本地人机模式";
+    return;
+  }
+  if (online.isHost) {
+    const phase = waitingView ? "等待开始" : "游戏中";
+    const seats = Object.keys(online.seatClients).sort()
+      .map(seat => `${seat}号 ${(state.players[seat] && state.players[seat].name) || `玩家 ${seat}`} ${waitingView ? (online.readySeats[seat] ? "已准备" : "未准备") : ""}`.trim())
+      .join("、") || "暂无真人加入";
+    const hostReady = waitingView ? ` · 房主${online.readySeats[0] ? "已准备" : "未准备"}` : "";
+    el.onlineStatus.textContent = `房号 ${online.roomId || "生成中"} · ${phase}${hostReady} · ${seats}`;
+  } else {
+    const readyText = waitingView ? ` · ${online.readySeats[online.seat] ? "已准备" : "未准备"}` : "";
+    el.onlineStatus.textContent = extra || `房号 ${online.roomId} · 座位 ${online.seat}${readyText}`;
   }
 }
 

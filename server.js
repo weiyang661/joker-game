@@ -265,6 +265,7 @@ function joinRoom(client, message) {
     send(client, { type: "error", message: "房间已满" });
     return;
   }
+  const oldSeat = room.seats[seat];
   room.clients.set(client.id, client);
   room.emptySince = null;
   clearRoomCleanup(room);
@@ -272,6 +273,7 @@ function joinRoom(client, message) {
   client.seat = seat;
   client.sessionId = String(message.sessionId || "");
   room.seats[seat] = humanSeat(client, seat, message.name || `玩家 ${seat}`, message.avatarUrl || "");
+  if (oldSeat && oldSeat.bot && !oldSeat.human) room.seats[seat].ready = false;
   send(client, { type: "joined", roomId: room.id, clientId: client.id, seat, creatorId: room.creatorId });
   broadcastRoomState(room);
   sendRoomSnapshot(room, client);

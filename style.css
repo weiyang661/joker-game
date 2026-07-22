@@ -2760,6 +2760,27 @@ body[data-miniapp="true"] .waitingDockBtn {
   white-space: nowrap;
 }
 
+body[data-miniapp="true"][data-waiting-room="true"] .handPanel,
+body[data-miniapp="true"][data-waiting-room="true"] .handActions,
+body[data-miniapp="true"][data-waiting-room="true"] .actionRail,
+body[data-miniapp="true"][data-waiting-room="true"] .sidePanel {
+  display: none !important;
+}
+
+body[data-miniapp="true"][data-waiting-room="true"] .waitingDock {
+  left: 50%;
+  right: auto;
+  bottom: max(18px, calc(env(safe-area-inset-bottom, 0px) + 18px));
+  transform: translateX(-50%);
+  width: auto;
+  max-width: 58vw;
+  justify-content: center;
+}
+
+body[data-miniapp="true"][data-waiting-room="true"] .waitingDockBtn {
+  min-width: clamp(112px, 16vw, 170px);
+}
+
 body[data-miniapp="true"] .trickScoreBadge {
   font-size: clamp(28px, 10vh, 54px);
 }

@@ -7,7 +7,7 @@ const root = __dirname;
 const uploadRoot = path.join(root, "uploads");
 const rooms = new Map();
 const startedAt = Date.now();
-const version = "2026-07-22-room-snapshot-sync-v1";
+const version = "2026-07-22-stable-seat-sync-v3";
 const ROOM_IDLE_TTL_MS = 10 * 60 * 1000;
 
 const server = http.createServer((req, res) => {
@@ -300,7 +300,13 @@ function rejoinRoom(client, message) {
   if (preferred >= 0 && preferred <= 4) {
     const preferredSeat = room.seats[preferred];
     if (preferredSeat && preferredSeat.human && !preferredSeat.connected) {
-      if (!preferredSeat.sessionId || preferredSeat.sessionId === sessionId || preferredSeat.name === fallbackName) {
+      const sessionMatches = !!sessionId && preferredSeat.sessionId === sessionId;
+      const canReclaimCreator = preferred === 0
+        && sessionMatches
+        && (!room.creatorSessionId || room.creatorSessionId === sessionId);
+      const canReclaimPlayer = preferred > 0
+        && (!preferredSeat.sessionId || sessionMatches || preferredSeat.name === fallbackName);
+      if (canReclaimCreator || canReclaimPlayer) {
         seatIndex = preferred;
       }
     }
@@ -478,12 +484,13 @@ function humanSeat(client, seat, name, avatarUrl) {
   };
 }
 
-function firstOpenSeat(room, preferred) {
-  if (preferred >= 0 && preferred <= 4 && (!room.seats[preferred] || room.seats[preferred].bot)) return preferred;
+function firstOpenSeat(room, preferred, allowSeatZero = false) {
+  if (allowSeatZero && preferred === 0 && (!room.seats[0] || room.seats[0].bot)) return 0;
+  if (preferred >= 1 && preferred <= 4 && (!room.seats[preferred] || room.seats[preferred].bot)) return preferred;
   for (let seat = 1; seat <= 4; seat += 1) {
     if (!room.seats[seat] || room.seats[seat].bot) return seat;
   }
-  return !room.seats[0] || room.seats[0].bot ? 0 : null;
+  return allowSeatZero && (!room.seats[0] || room.seats[0].bot) ? 0 : null;
 }
 
 function broadcastRoomState(room) {

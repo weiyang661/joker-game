@@ -278,6 +278,14 @@ function localSeat() {
   return online.roomId ? online.seat : 0;
 }
 
+function applyLocalSeat(seat) {
+  const nextSeat = Number(seat);
+  if (Number.isFinite(nextSeat) && nextSeat >= 0 && nextSeat <= 4) {
+    online.seat = nextSeat;
+  }
+  online.isHost = Number(online.seat) === 0;
+}
+
 function localPlayer() {
   return state.players[localSeat()] || state.players[0];
 }
@@ -296,9 +304,7 @@ function isOnlineRoomMember() {
 
 function isHumanControlled(seat) {
   if (!online.roomId) return seat === 0;
-  if (!online.connected) return false;
-  if (!online.isHost) return seat === localSeat();
-  return seat === 0 || Object.prototype.hasOwnProperty.call(online.seatClients, seat);
+  return online.connected && seat === localSeat();
 }
 
 function preservedOnlineNames() {
@@ -329,8 +335,7 @@ function playerProfileForSeat(seat, fallbackName = "", profiles = {}) {
 
 function isOnlineHumanSeat(index) {
   if (!online.connected) return index === 0;
-  if (index === 0 && online.isHost) return true;
-  return Object.prototype.hasOwnProperty.call(online.seatClients, index);
+  return index === localSeat() || Object.prototype.hasOwnProperty.call(online.seatClients, index);
 }
 
 function makeLobbyPlayer(index, name, profiles = {}) {
@@ -395,7 +400,6 @@ function normalizeOnlineLobbyState() {
 function isSeatHumanInWaiting(index) {
   if (!online.connected) return index === 0;
   if (index === localSeat()) return true;
-  if (index === 0 && online.isHost) return true;
   return Object.prototype.hasOwnProperty.call(online.seatClients, index);
 }
 
@@ -462,8 +466,12 @@ function allJoinedPlayersReady() {
 function canStartWaitingRoom() {
   if (!online.connected || !online.isHost || !isWaitingRoomView()) return false;
   const seats = humanSeatsInRoom();
-  if (!seats.length) return false;
-  return seats.every(seat => seat === localSeat() || online.readySeats[seat]);
+  if (!seats.includes(localSeat())) return false;
+  return !unreadyJoinedSeats().length;
+}
+
+function unreadyJoinedSeats() {
+  return humanSeatsInRoom().filter(seat => seat !== localSeat() && !online.readySeats[seat]);
 }
 
 function setSeatReady(seat, ready) {
@@ -580,9 +588,9 @@ function scheduleBotRevealChoices() {
   state.revealToken = token;
   for (const player of state.players) {
     const bigs = player.hand.filter(card => card.joker === "big");
-    if (!isHumanControlled(player.id) && bigs.length) {
+    if (!player.human && bigs.length) {
       setTimeout(() => {
-        if (state.revealToken === token && !isHumanControlled(player.id)) {
+        if (state.revealToken === token && !player.human) {
           decidePlayerBigReveal(player, botRevealCount(bigs.length));
         }
       }, 450 + player.id * 220);
@@ -1197,13 +1205,13 @@ function maybeBotTurn() {
   if (state.revealPhase) return;
   if (state.pendingSnowChoice) {
     const hasHumanWinner = unfinishedTeamPlayers(state.pendingSnowChoice.winnerTeam)
-      .some(player => isHumanControlled(player.id));
+      .some(player => player.human);
     if (!hasHumanWinner) setTimeout(() => chooseSnowChoice("snow"), 450);
     return;
   }
   if (state.gameOver && !state.continuingForNextLead) return;
   const player = state.players[state.current];
-  if (!player || isHumanControlled(player.id) || player.finished) return;
+  if (!player || player.human || player.finished) return;
   setTimeout(() => {
     const move = chooseMove(player);
     if (move.length) playCards(player, move);
@@ -2000,7 +2008,7 @@ function applySnapshot(message) {
   const previousSeat = online.seat;
   loadState(message.state);
   const snapshotHasCards = hasAnyCardsDealt();
-  online.seat = message.seat;
+  applyLocalSeat(message.seat);
   online.roomId = message.roomId || online.roomId;
   online.roomStarted = !!message.roomStarted || (!message.waitingRoom && snapshotHasCards);
   online.waitingRoom = !!message.waitingRoom && !online.roomStarted;
@@ -2018,13 +2026,14 @@ function applySnapshot(message) {
 
 function applyRoomState(message) {
   const alreadyDealt = hasAnyCardsDealt();
+  const serverStarted = !!message.started;
+  const keepLocalStarted = !serverStarted && alreadyDealt && online.roomStarted;
   online.roomId = message.roomId || online.roomId;
   online.clientId = message.clientId || online.clientId;
   online.creatorId = message.creatorId || online.creatorId;
-  if (Number.isFinite(Number(message.seat))) online.seat = Number(message.seat);
-  online.isHost = !!online.clientId && online.clientId === online.creatorId;
+  applyLocalSeat(message.seat);
   online.connected = true;
-  online.roomStarted = !!message.started || online.roomStarted;
+  online.roomStarted = serverStarted || keepLocalStarted;
   cancelReconnect();
 
   online.seatClients = {};
@@ -2042,7 +2051,13 @@ function applyRoomState(message) {
     if (seatInfo.ready) online.readySeats[index] = true;
   });
 
-  if (online.roomStarted && !alreadyDealt) {
+  if (!online.roomStarted) {
+    online.waitingRoom = true;
+    if (!isWaitingRoomView() || alreadyDealt || state.gameOver) {
+      setupWaitingRoom({ preserveProfiles: profiles });
+    }
+    online.hasSnapshot = !!message.hasSnapshot;
+  } else if (online.roomStarted && !alreadyDealt) {
     online.waitingRoom = false;
     requestRoomSnapshot();
   } else if (!alreadyDealt && (!online.hasSnapshot || !state.players.length)) {
@@ -2092,22 +2107,6 @@ function broadcastSnapshot() {
       readySeats: online.readySeats
     }
   });
-  for (const [seat, clientId] of Object.entries(online.seatClients)) {
-    if (clientId === online.clientId) continue;
-    sendSocket({
-      type: "relay",
-      to: clientId,
-      payload: {
-        type: "snapshot",
-        state: snapshotState,
-        seat: Number(seat),
-        roomId: online.roomId,
-        waitingRoom,
-        roomStarted,
-        readySeats: online.readySeats
-      }
-    });
-  }
   updateOnlineStatus();
 }
 
@@ -3113,6 +3112,70 @@ el.startOnlineBtn.addEventListener("click", () => {
   setTimeout(() => broadcastSnapshot(), 800);
 });
 
+el.startOnlineBtn.addEventListener("click", () => {
+  if (!online.connected || !online.isHost || online.roomStarted) return;
+  normalizeOnlineLobbyState();
+  if (!isWaitingRoomView()) return;
+  const notReady = unreadyJoinedSeats();
+  if (notReady.length) {
+    state.tableNotice = `还有真人玩家未准备：${notReady.map(seat => (state.players[seat] && state.players[seat].name) || `玩家 ${seat}`).join("、")}`;
+    render();
+    return;
+  }
+  online.readySeats[localSeat()] = true;
+  fillEmptySeatsWithBots();
+  online.waitingRoom = false;
+  online.roomStarted = true;
+  online.hasSnapshot = true;
+  state.gameOver = false;
+  startGame({ preserveNames: preservedOnlineNames() });
+  broadcastSnapshot();
+  setTimeout(() => broadcastSnapshot(), 200);
+  setTimeout(() => broadcastSnapshot(), 800);
+});
+
+function startOnlineRoundFromLobby() {
+  if (!online.connected || !online.roomId || !online.isHost) return false;
+  applyLocalSeat(0);
+  normalizeOnlineLobbyState();
+  if (hasAnyCardsDealt()) return false;
+
+  const notReady = unreadyJoinedSeats();
+  if (notReady.length) {
+    state.tableNotice = `还有真人玩家未准备：${notReady.map(seat => (state.players[seat] && state.players[seat].name) || `玩家 ${seat}`).join("、")}`;
+    render();
+    return true;
+  }
+
+  online.readySeats[localSeat()] = true;
+  fillEmptySeatsWithBots();
+  online.waitingRoom = false;
+  online.roomStarted = true;
+  online.hasSnapshot = true;
+  state.gameOver = false;
+  state.roundSettled = false;
+  state.lastSettlement = [];
+  startGame({ preserveNames: preservedOnlineNames() });
+
+  if (!hasAnyCardsDealt()) {
+    state.tableNotice = "发牌没有完成，请再点一次开始本局";
+    render();
+    return true;
+  }
+
+  broadcastSnapshot();
+  setTimeout(() => broadcastSnapshot(), 120);
+  setTimeout(() => broadcastSnapshot(), 450);
+  setTimeout(() => broadcastSnapshot(), 1000);
+  return true;
+}
+
+el.startOnlineBtn.addEventListener("click", event => {
+  if (!startOnlineRoundFromLobby()) return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+}, true);
+
 el.readyBtn.addEventListener("click", () => {
   normalizeOnlineLobbyState();
   if (!online.connected || !isWaitingRoomView()) return;
@@ -3134,8 +3197,7 @@ el.hostBtn.addEventListener("click", async () => {
     setJoining(false);
     return;
   }
-  online.isHost = true;
-  online.seat = 0;
+  applyLocalSeat(0);
   online.hasSnapshot = true;
   state.players[0].name = cleanPlayerName(el.nameInput.value, "房主");
   state.players[0].avatarUrl = cleanAvatarUrl(bootParams.get("avatar"));
@@ -3173,9 +3235,10 @@ async function joinRoomFromInputs(options = {}) {
     setJoining(false);
     return;
   }
-  online.isHost = false;
-  const requestedSeat = Number(options.seat || el.seatSelect.value);
+  const requestedSeatRaw = Number(options.seat || el.seatSelect.value);
+  const requestedSeat = requestedSeatRaw >= 1 && requestedSeatRaw <= 4 ? requestedSeatRaw : 1;
   online.seat = requestedSeat;
+  online.isHost = false;
   online.roomId = roomId;
   const name = cleanPlayerName(options.name != null ? options.name : el.nameInput.value, `玩家 ${requestedSeat}`);
   el.roomInput.value = roomId;
@@ -3613,8 +3676,8 @@ function handleSocketMessage(message) {
     online.clientId = message.clientId;
     online.creatorId = message.creatorId || message.clientId;
     online.connected = true;
-    online.isHost = true;
-    online.seat = Number.isFinite(Number(message.seat)) ? Number(message.seat) : 0;
+    applyLocalSeat(Number.isFinite(Number(message.seat)) ? Number(message.seat) : 0);
+    online.roomStarted = false;
     online.hasSnapshot = true;
     online.seatClients = {};
     online.clientSeats = {};
@@ -3649,8 +3712,8 @@ function handleSocketMessage(message) {
     online.clientId = message.clientId;
     online.creatorId = message.creatorId || online.creatorId;
     online.connected = true;
-    online.isHost = false;
-    online.seat = Number.isFinite(Number(message.seat)) ? Number(message.seat) : online.seat;
+    applyLocalSeat(message.seat);
+    online.roomStarted = false;
     postMiniProgramRoom(online.roomId);
     updateOnlineStatus("已加入，等待房主同步牌局");
     setJoining(true, "已加入房间", "等待房主同步牌局...");
@@ -3663,8 +3726,7 @@ function handleSocketMessage(message) {
     online.clientId = message.clientId;
     online.creatorId = message.creatorId || online.creatorId;
     online.connected = true;
-    online.seat = Number.isFinite(Number(message.seat)) ? Number(message.seat) : online.seat;
-    online.isHost = !!online.clientId && online.clientId === online.creatorId;
+    applyLocalSeat(message.seat);
     postMiniProgramRoom(online.roomId);
     setJoining(false);
     updateOnlineStatus("已重新进入牌局");
@@ -3675,6 +3737,7 @@ function handleSocketMessage(message) {
     applyRoomState(message);
     return;
   }
+  if (message.type === "joinRequest" || message.type === "peerLeft") return;
   if (message.type === "joinRequest" && online.isHost) {
     const requestedSeat = Number(message.seat);
     const seat = firstOpenSeat(requestedSeat);

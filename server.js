@@ -421,15 +421,26 @@ function relayLegacyGameMessage(room, client, message) {
   broadcast(room, message.payload, client);
 }
 
+function snapshotHasDealtCards(payload) {
+  if (!payload || !payload.state) return false;
+  try {
+    const parsed = JSON.parse(payload.state);
+    return Array.isArray(parsed.players) && parsed.players.some(player => Array.isArray(player.hand) && player.hand.length > 0);
+  } catch {
+    return false;
+  }
+}
+
 function storeRoomSnapshot(room, client, payload) {
   if (client.id !== room.creatorId) return;
   if (!payload || payload.type !== "snapshot" || !payload.state) return;
-  room.started = !!payload.roomStarted || !payload.waitingRoom;
+  const hasCards = snapshotHasDealtCards(payload);
+  room.started = hasCards && (!!payload.roomStarted || !payload.waitingRoom);
   room.snapshot = {
     type: "snapshot",
     state: payload.state,
     roomId: room.id,
-    waitingRoom: !!payload.waitingRoom && !room.started,
+    waitingRoom: !room.started,
     roomStarted: room.started,
     readySeats: payload.readySeats || {},
     updatedAt: Date.now()

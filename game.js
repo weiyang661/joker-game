@@ -361,9 +361,10 @@ function makeLobbyPlayer(index, name, profiles = {}) {
 }
 
 function isWaitingRoomView() {
-  if (online.roomStarted) return false;
   const noCardsDealt = state.players.every(player => !player.hand || player.hand.length === 0);
+  if (online.roomStarted && !noCardsDealt) return false;
   return !!(online.roomId && noCardsDealt && (
+    online.roomStarted ||
     online.waitingRoom ||
     (!state.hasPlayed && !state.revealPhase && !state.roundSettled && !state.lastSettlement.length)
   ));
@@ -373,10 +374,14 @@ function hasAnyCardsDealt() {
   return state.players.some(player => player.hand && player.hand.length > 0);
 }
 
+function isOnlineStartStalled() {
+  return !!(online.roomId && online.roomStarted && !hasAnyCardsDealt());
+}
+
 function normalizeOnlineLobbyState() {
   if (!online.roomId || hasAnyCardsDealt()) return;
   if (online.roomStarted) {
-    online.waitingRoom = false;
+    online.waitingRoom = true;
     state.gameOver = false;
     state.continuingForNextLead = false;
     if (!state.tableNotice || isFinalSettlementNotice(state.tableNotice) || state.tableNotice === "等待玩家加入并准备") {
@@ -464,7 +469,7 @@ function allJoinedPlayersReady() {
 }
 
 function canStartWaitingRoom() {
-  if (!online.connected || !online.isHost || !isWaitingRoomView()) return false;
+  if (!online.connected || !online.isHost || (!isWaitingRoomView() && !isOnlineStartStalled())) return false;
   const seats = humanSeatsInRoom();
   if (!seats.includes(localSeat())) return false;
   return !unreadyJoinedSeats().length;
@@ -2010,8 +2015,8 @@ function applySnapshot(message) {
   const snapshotHasCards = hasAnyCardsDealt();
   applyLocalSeat(message.seat);
   online.roomId = message.roomId || online.roomId;
-  online.roomStarted = !!message.roomStarted || (!message.waitingRoom && snapshotHasCards);
-  online.waitingRoom = !!message.waitingRoom && !online.roomStarted;
+  online.roomStarted = snapshotHasCards && (!!message.roomStarted || !message.waitingRoom);
+  online.waitingRoom = !online.roomStarted && (!!message.waitingRoom || !snapshotHasCards);
   online.readySeats = message.readySeats || {};
   online.hasSnapshot = true;
   if (state.players[online.seat] && !el.nameInput.value.trim()) el.nameInput.value = state.players[online.seat].name;
@@ -2058,7 +2063,7 @@ function applyRoomState(message) {
     }
     online.hasSnapshot = !!message.hasSnapshot;
   } else if (online.roomStarted && !alreadyDealt) {
-    online.waitingRoom = false;
+    online.waitingRoom = true;
     requestRoomSnapshot();
   } else if (!alreadyDealt && (!online.hasSnapshot || !state.players.length)) {
     setupWaitingRoom({ preserveProfiles: profiles });

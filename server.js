@@ -409,8 +409,17 @@ function handleRoomAction(room, client, message) {
       send(client, { type: "error", message: "只有创建房间的人可以开始本局" });
       return;
     }
+    if (!room.snapshot || !snapshotHasDealtCards(room.snapshot)) {
+      room.started = false;
+      broadcastRoomState(room);
+      send(client, { type: "error", message: "发牌还没有同步完成，请重新点击开始本局" });
+      return;
+    }
     room.started = true;
+    room.snapshot.waitingRoom = false;
+    room.snapshot.roomStarted = true;
     broadcastRoomState(room);
+    broadcastStoredSnapshot(room);
     return;
   }
   if (message.action === "socialEffect") {

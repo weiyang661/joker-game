@@ -233,11 +233,12 @@ function createRoom(client, message) {
     return;
   }
   const roomId = requestedRoomId || newRoomId();
-  client.sessionId = String(message.sessionId || "");
+  const sessionId = String(message.sessionId || "");
+  client.sessionId = sessionId;
   const room = {
     id: roomId,
     creatorId: client.id,
-    creatorSessionId: client.sessionId,
+    creatorSessionId: sessionId,
     clients: new Map([[client.id, client]]),
     seats: Array.from({ length: 5 }, () => null),
     voiceActiveUntil: new Map(),
@@ -250,7 +251,7 @@ function createRoom(client, message) {
   rooms.set(roomId, room);
   client.roomId = roomId;
   client.seat = 0;
-  client.sessionId = String(message.sessionId || "");
+  client.sessionId = sessionId;
   room.seats[0] = humanSeat(client, 0, message.name || "房主", message.avatarUrl || "");
   send(client, { type: "created", roomId, clientId: client.id, seat: 0, creatorId: room.creatorId });
   broadcastRoomState(room);
@@ -267,12 +268,15 @@ function joinRoom(client, message) {
     send(client, { type: "error", message: "房间不存在" });
     return;
   }
-  const seat = firstOpenSeat(room, Number(message.seat));
+  const sessionId = String(message.sessionId || "");
+  const reclaimedSeat = findSeatBySession(room, sessionId);
+  const seat = reclaimedSeat >= 0 ? reclaimedSeat : firstOpenSeat(room, Number(message.seat));
   if (seat === null) {
     send(client, { type: "error", message: "房间已满" });
     return;
   }
   const oldSeat = room.seats[seat];
+  detachSeatConnection(room, seat, client);
   room.clients.set(client.id, client);
   room.emptySince = null;
   clearRoomCleanup(room);
@@ -280,6 +284,7 @@ function joinRoom(client, message) {
   client.seat = seat;
   client.sessionId = String(message.sessionId || "");
   room.seats[seat] = humanSeat(client, seat, message.name || `玩家 ${seat}`, message.avatarUrl || "");
+  if (oldSeat && oldSeat.human) room.seats[seat].ready = !!oldSeat.ready;
   if (oldSeat && oldSeat.bot && !oldSeat.human) room.seats[seat].ready = false;
   send(client, { type: "joined", roomId: room.id, clientId: client.id, seat, creatorId: room.creatorId });
   broadcastRoomState(room);
@@ -297,15 +302,19 @@ function rejoinRoom(client, message) {
   const fallbackName = cleanName(message.name, "player");
   const preferred = Number(message.seat);
   let seatIndex = null;
+  if (sessionId) {
+    const found = findSeatBySession(room, sessionId);
+    if (found >= 0) seatIndex = found;
+  }
   if (preferred >= 0 && preferred <= 4) {
     const preferredSeat = room.seats[preferred];
-    if (preferredSeat && preferredSeat.human && !preferredSeat.connected) {
+    if (seatIndex === null && preferredSeat && preferredSeat.human) {
       const sessionMatches = !!sessionId && preferredSeat.sessionId === sessionId;
       const canReclaimCreator = preferred === 0
         && sessionMatches
         && (!room.creatorSessionId || room.creatorSessionId === sessionId);
       const canReclaimPlayer = preferred > 0
-        && (!preferredSeat.sessionId || sessionMatches || preferredSeat.name === fallbackName);
+        && (!preferredSeat.connected || sessionMatches || preferredSeat.name === fallbackName);
       if (canReclaimCreator || canReclaimPlayer) {
         seatIndex = preferred;
       }
@@ -322,6 +331,7 @@ function rejoinRoom(client, message) {
   }
 
   const oldSeat = room.seats[seatIndex] || {};
+  detachSeatConnection(room, seatIndex, client);
   room.clients.set(client.id, client);
   room.emptySince = null;
   clearRoomCleanup(room);
@@ -392,6 +402,15 @@ function handleRoomAction(room, client, message) {
       room.seats[targetSeat] = null;
       broadcastRoomState(room);
     }
+    return;
+  }
+  if (message.action === "startRound") {
+    if (client.id !== room.creatorId) {
+      send(client, { type: "error", message: "只有创建房间的人可以开始本局" });
+      return;
+    }
+    room.started = true;
+    broadcastRoomState(room);
     return;
   }
   if (message.action === "socialEffect") {
@@ -502,6 +521,24 @@ function firstOpenSeat(room, preferred, allowSeatZero = false) {
     if (!room.seats[seat] || room.seats[seat].bot) return seat;
   }
   return allowSeatZero && (!room.seats[0] || room.seats[0].bot) ? 0 : null;
+}
+
+function findSeatBySession(room, sessionId) {
+  if (!room || !sessionId) return -1;
+  return room.seats.findIndex(seat => seat && seat.human && seat.sessionId === sessionId);
+}
+
+function detachSeatConnection(room, seatIndex, replacementClient) {
+  if (!room || seatIndex === null || seatIndex === undefined) return;
+  for (const peer of Array.from(room.clients.values())) {
+    if (peer === replacementClient || peer.seat !== seatIndex) continue;
+    room.clients.delete(peer.id);
+    peer.roomId = null;
+    peer.seat = null;
+    try {
+      if (peer.socket && !peer.socket.destroyed) peer.socket.end();
+    } catch {}
+  }
 }
 
 function broadcastRoomState(room) {

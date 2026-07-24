@@ -141,6 +141,7 @@ const online = {
   seatClients: {},
   clientSeats: {},
   readySeats: {},
+  seatProfiles: {},
   waitingRoom: false,
   joining: false,
   hasSnapshot: false,
@@ -149,6 +150,7 @@ const online = {
   connectionPromise: null,
   pendingRole: "",
   roomStarted: false,
+  lastSnapshotAt: 0,
   snapshotRequestedAt: 0,
   reconnectTimer: null,
   reconnectAttempts: 0
@@ -274,12 +276,16 @@ function localSeat() {
   return online.roomId ? online.seat : 0;
 }
 
+function refreshHostFlag() {
+  online.isHost = !online.roomId || (!!online.clientId && !!online.creatorId && online.clientId === online.creatorId);
+}
+
 function applyLocalSeat(seat) {
   const nextSeat = Number(seat);
   if (Number.isFinite(nextSeat) && nextSeat >= 0 && nextSeat <= 4) {
     online.seat = nextSeat;
   }
-  online.isHost = Number(online.seat) === 0;
+  refreshHostFlag();
 }
 
 function localPlayer() {
@@ -316,7 +322,12 @@ function preservedOnlineProfiles() {
   const profiles = {};
   state.players.forEach((player, index) => {
     if (!player) return;
-    profiles[index] = { name: player.name, avatarUrl: player.avatarUrl || "" };
+    profiles[index] = {
+      name: player.name,
+      avatarUrl: player.avatarUrl || "",
+      human: !!player.human,
+      bot: !!player.botFilled
+    };
   });
   return profiles;
 }
@@ -327,6 +338,20 @@ function playerProfileForSeat(seat, fallbackName = "", profiles = {}) {
     name: profile.name || fallbackName,
     avatarUrl: cleanAvatarUrl(profile.avatarUrl)
   };
+}
+
+function applySeatProfilesToPlayers(profiles = online.seatProfiles || {}) {
+  Object.keys(profiles || {}).forEach(key => {
+    const index = Number(key);
+    const player = state.players[index];
+    if (!player) return;
+    const profile = profiles[key] || profiles[index] || {};
+    if (profile.name) player.name = cleanPlayerName(profile.name, index === 0 ? "房主" : `玩家 ${index}`);
+    const avatarUrl = cleanAvatarUrl(profile.avatarUrl);
+    if (avatarUrl) player.avatarUrl = avatarUrl;
+    if (profile.human !== undefined) player.human = !!profile.human;
+    if (profile.bot !== undefined) player.botFilled = !!profile.bot;
+  });
 }
 
 function isOnlineHumanSeat(index) {
@@ -1981,17 +2006,26 @@ function scheduleSnapshotApply(message) {
 }
 
 function applySnapshot(message) {
+  const stamp = Number(message.updatedAt || 0);
+  if (stamp && online.lastSnapshotAt && stamp < online.lastSnapshotAt) return;
+  if (stamp) online.lastSnapshotAt = stamp;
   const previousSeat = online.seat;
-  loadState(message.state);
-  const snapshotHasCards = hasAnyCardsDealt();
-  applyLocalSeat(message.seat);
+  const typedName = el.nameInput ? el.nameInput.value.trim() : "";
   online.roomId = message.roomId || online.roomId;
+  applyLocalSeat(message.seat);
+  loadState(message.state);
+  applySeatProfilesToPlayers();
+  const currentPlayer = state.players[online.seat];
+  if (currentPlayer) {
+    if (typedName) currentPlayer.name = cleanPlayerName(typedName, online.seat === 0 ? "房主" : `玩家 ${online.seat}`);
+    if (el.nameInput && !el.nameInput.value.trim()) el.nameInput.value = currentPlayer.name;
+  }
+  const snapshotHasCards = hasAnyCardsDealt();
   online.roomStarted = snapshotHasCards && (!!message.roomStarted || !message.waitingRoom);
   online.waitingRoom = !online.roomStarted && (!!message.waitingRoom || !snapshotHasCards);
-  online.readySeats = message.readySeats || {};
+  online.readySeats = message.readySeats || online.readySeats || {};
   online.hasSnapshot = true;
-  if (state.players[online.seat] && !el.nameInput.value.trim()) el.nameInput.value = state.players[online.seat].name;
-  if (previousSeat && previousSeat !== online.seat) {
+  if (previousSeat !== online.seat) {
     state.tableNotice = `你选择的座位已占用，已自动进入座位 ${online.seat}`;
   }
   normalizeOnlineLobbyState();
@@ -2004,6 +2038,7 @@ function applyRoomState(message) {
   const alreadyDealt = hasAnyCardsDealt();
   const serverStarted = !!message.started;
   const keepLocalStarted = !serverStarted && alreadyDealt && online.roomStarted;
+  const typedName = el.nameInput ? el.nameInput.value.trim() : "";
   online.roomId = message.roomId || online.roomId;
   online.clientId = message.clientId || online.clientId;
   online.creatorId = message.creatorId || online.creatorId;
@@ -2019,13 +2054,24 @@ function applyRoomState(message) {
   const profiles = {};
   seats.forEach((seatInfo, index) => {
     if (!seatInfo) return;
-    profiles[index] = { name: seatInfo.name || `玩家 ${index}`, avatarUrl: seatInfo.avatarUrl || "" };
+    profiles[index] = {
+      name: seatInfo.name || (index === 0 ? "房主" : `玩家 ${index}`),
+      avatarUrl: seatInfo.avatarUrl || "",
+      human: !!seatInfo.human,
+      bot: !!seatInfo.bot,
+      ready: !!seatInfo.ready,
+      connected: seatInfo.connected !== false
+    };
     if (seatInfo.human && seatInfo.clientId && seatInfo.connected !== false) {
       online.seatClients[index] = seatInfo.clientId;
       online.clientSeats[seatInfo.clientId] = index;
     }
     if (seatInfo.ready) online.readySeats[index] = true;
   });
+  if (typedName && profiles[online.seat]) {
+    profiles[online.seat].name = cleanPlayerName(typedName, online.seat === 0 ? "房主" : `玩家 ${online.seat}`);
+  }
+  online.seatProfiles = profiles;
 
   if (!online.roomStarted) {
     online.waitingRoom = true;
@@ -2053,13 +2099,17 @@ function applyRoomState(message) {
       }
       return;
     }
-    player.name = seatInfo.name || (index === 0 ? "房主" : `玩家 ${index}`);
-    player.avatarUrl = cleanAvatarUrl(seatInfo.avatarUrl) || player.avatarUrl || "";
+    const profile = profiles[index] || {};
+    player.name = profile.name || (index === 0 ? "房主" : `玩家 ${index}`);
+    player.avatarUrl = cleanAvatarUrl(profile.avatarUrl) || player.avatarUrl || "";
     if (!alreadyDealt) {
-      player.human = !!seatInfo.human;
-      player.botFilled = !!seatInfo.bot;
+      player.human = !!profile.human;
+      player.botFilled = !!profile.bot;
     }
   });
+  if (state.players[online.seat] && el.nameInput && !el.nameInput.value.trim()) {
+    el.nameInput.value = state.players[online.seat].name;
+  }
 
   normalizeOnlineLobbyState();
   setJoining(false);
@@ -2987,7 +3037,7 @@ function startOnlineRoundFromLobby() {
   online.roomStarted = true;
   online.hasSnapshot = true;
   broadcastSnapshot();
-  sendSocket({ type: "action", action: "startRound" });
+  setTimeout(() => sendSocket({ type: "action", action: "startRound" }), 80);
   setTimeout(() => broadcastSnapshot(), 120);
   setTimeout(() => broadcastSnapshot(), 450);
   setTimeout(() => broadcastSnapshot(), 1000);
@@ -3435,14 +3485,16 @@ function handleSocketMessage(message) {
     if (el.roomInput) el.roomInput.value = online.roomId;
     postMiniProgramRoom(online.roomId);
     history.replaceState(null, "", inviteUrl(online.roomId));
+    const hostProfile = {
+      name: cleanPlayerName(el.nameInput.value, "房主"),
+      avatarUrl: cleanAvatarUrl(bootParams.get("avatar")) || (state.players[0] && state.players[0].avatarUrl) || "",
+      human: true,
+      bot: false
+    };
+    online.seatProfiles = { 0: hostProfile };
     setupWaitingRoom({
       resetMatch: true,
-      preserveProfiles: {
-        0: {
-          name: cleanPlayerName(el.nameInput.value, "房主"),
-          avatarUrl: cleanAvatarUrl(bootParams.get("avatar")) || (state.players[0] && state.players[0].avatarUrl) || ""
-        }
-      }
+      preserveProfiles: online.seatProfiles
     });
     state.tableNotice = `房间 ${online.roomId} 已创建，等待玩家加入`;
     addLog(`房间 ${online.roomId} 已创建`);
@@ -3540,11 +3592,6 @@ function handleSocketMessage(message) {
     return;
   }
   if (message.type === "snapshot") {
-    if (!online.isHost && Number(message.seat) === 0) {
-      setJoining(false);
-      updateOnlineStatus("收到异常座位同步，已拒绝切换到房主视角，请重新连接");
-      return;
-    }
     scheduleSnapshotApply(message);
     return;
   }
